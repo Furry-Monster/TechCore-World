@@ -71,7 +71,7 @@ namespace Demo
                     validateScenesOnLoad = true
                 };
 
-                sceneManager.SetSettings(settings);
+                sceneManager.Settings = settings;
                 sceneManager.InitializeSceneManager();
 
                 AddLog("SceneManager automatically created and initialized");
@@ -264,7 +264,7 @@ namespace Demo
         {
             GUILayout.Label("📊 System Status:", GUI.skin.box);
 
-            var isInitialized = SceneManagerMain.Instance?.IsInitialized() ?? false;
+            var isInitialized = SceneManagerMain.Instance?.IsInitialized ?? false;
             var currentScene = SceneManager.GetActiveScene().name;
 
             GUILayout.Label($"🟢 Status: {statusMessage}");

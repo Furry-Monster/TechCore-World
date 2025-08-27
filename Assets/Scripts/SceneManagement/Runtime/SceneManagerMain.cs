@@ -34,6 +34,19 @@ namespace SceneManagement.Runtime
         [Header("Scene Manager Configuration")] [SerializeField]
         private SceneManagerSettings settings = new();
 
+        public SceneManagerSettings Settings
+        {
+            get => settings;
+            set
+            {
+                settings = value;
+                if (isInitialized)
+                {
+                    ConfigureComponents();
+                }
+            }
+        }
+
         [Header("Component References")] [SerializeField]
         private SceneManagerCore sceneManagerCore;
 
@@ -51,6 +64,9 @@ namespace SceneManagement.Runtime
         public SceneEvents Events => sceneEvents;
 
         private bool isInitialized;
+
+        public bool IsInitialized => isInitialized;
+
 
         private void Awake()
         {
@@ -100,89 +116,50 @@ namespace SceneManagement.Runtime
 
         private void CreateOrFindComponents()
         {
-            if (sceneManagerCore == null)
+            sceneManagerCore ??= GetComponent<SceneManagerCore>()
+                                 ?? gameObject.AddComponent<SceneManagerCore>();
+
+            if (settings.enableTransitions)
             {
-                sceneManagerCore = GetComponent<SceneManagerCore>();
-                if (sceneManagerCore == null)
-                {
-                    sceneManagerCore = gameObject.AddComponent<SceneManagerCore>();
-                }
+                sceneTransition ??= GetComponent<SceneTransition>()
+                                    ?? gameObject.AddComponent<SceneTransition>();
             }
 
-            if (sceneTransition == null && settings.enableTransitions)
+            if (settings.enablePreloading)
             {
-                sceneTransition = GetComponent<SceneTransition>();
-                if (sceneTransition == null)
-                {
-                    sceneTransition = gameObject.AddComponent<SceneTransition>();
-                }
+                scenePreloader ??= GetComponent<ScenePreloader>()
+                                   ?? gameObject.AddComponent<ScenePreloader>();
             }
 
-            if (scenePreloader == null && settings.enablePreloading)
+            sceneDataManager ??= GetComponent<SceneDataManager>()
+                                 ?? gameObject.AddComponent<SceneDataManager>();
+
+            if (settings.validateScenesOnLoad)
             {
-                scenePreloader = GetComponent<ScenePreloader>();
-                if (scenePreloader == null)
-                {
-                    scenePreloader = gameObject.AddComponent<ScenePreloader>();
-                }
+                sceneValidator ??= GetComponent<SceneValidator>()
+                                   ?? gameObject.AddComponent<SceneValidator>();
             }
 
-            if (sceneDataManager == null)
-            {
-                sceneDataManager = GetComponent<SceneDataManager>();
-                if (sceneDataManager == null)
-                {
-                    sceneDataManager = gameObject.AddComponent<SceneDataManager>();
-                }
-            }
-
-            if (sceneValidator == null && settings.validateScenesOnLoad)
-            {
-                sceneValidator = GetComponent<SceneValidator>();
-                if (sceneValidator == null)
-                {
-                    sceneValidator = gameObject.AddComponent<SceneValidator>();
-                }
-            }
-
-            if (sceneEvents == null)
-            {
-                sceneEvents = GetComponent<SceneEvents>();
-                if (sceneEvents == null)
-                {
-                    sceneEvents = gameObject.AddComponent<SceneEvents>();
-                }
-            }
+            sceneEvents ??= GetComponent<SceneEvents>()
+                            ?? gameObject.AddComponent<SceneEvents>();
         }
 
         private void ConfigureComponents()
         {
-            if (scenePreloader != null)
-            {
-                scenePreloader.SetMaxConcurrentPreloads(settings.maxConcurrentPreloads);
-                scenePreloader.EnableSmartPreloading(settings.enablePreloading);
-            }
+            scenePreloader?.SetMaxConcurrentPreloads(settings.maxConcurrentPreloads);
+            scenePreloader?.EnableSmartPreloading(settings.enablePreloading);
 
-            if (sceneDataManager != null)
-            {
-                sceneDataManager.EnableAutoSave(settings.enableAutoSave);
-                sceneDataManager.SetAutoSaveInterval(settings.autoSaveInterval);
-            }
+            sceneDataManager?.EnableAutoSave(settings.enableAutoSave);
+            sceneDataManager?.SetAutoSaveInterval(settings.autoSaveInterval);
 
-            if (sceneValidator != null)
-            {
-                sceneValidator.SetValidationSettings(
-                    settings.validateScenesOnLoad,
-                    true,
-                    settings.enableLogging,
-                    settings.blockLoadOnCriticalErrors
-                );
-            }
+            sceneValidator?.SetValidationSettings(
+                settings.validateScenesOnLoad,
+                true,
+                settings.enableLogging,
+                settings.blockLoadOnCriticalErrors
+            );
 
-            if (sceneEvents != null)
-            {
-                sceneEvents.SetEventSettings(true, 10, settings.enableLogging);
-            }
+            sceneEvents?.SetEventSettings(true, 10, settings.enableLogging);
         }
 
         public void LoadSceneWithTransition(string sceneName, float? duration = null, bool? showLoading = null)
@@ -273,26 +250,6 @@ namespace SceneManagement.Runtime
             }
         }
 
-        public void SetSettings(SceneManagerSettings newSettings)
-        {
-            settings = newSettings;
-
-            if (isInitialized)
-            {
-                ConfigureComponents();
-            }
-        }
-
-        public SceneManagerSettings GetSettings()
-        {
-            return settings;
-        }
-
-        public bool IsInitialized()
-        {
-            return isInitialized;
-        }
-
         public void Shutdown()
         {
             if (sceneEvents != null)
@@ -315,119 +272,6 @@ namespace SceneManagement.Runtime
                 Shutdown();
                 Instance = null;
             }
-        }
-
-        [Serializable]
-        public class SceneManagerInfo
-        {
-            public string version = "1.0.0";
-
-            public string[] supportedFeatures =
-            {
-                "Async Scene Loading",
-                "Scene Transitions",
-                "Scene Preloading",
-                "Save/Load System",
-                "Scene Validation",
-                "Event System"
-            };
-        }
-
-        public static SceneManagerInfo GetSystemInfo()
-        {
-            return new SceneManagerInfo();
-        }
-
-        [ContextMenu("Create Scene Management System")]
-        public void CreateCompleteSystem()
-        {
-            if (Application.isPlaying)
-            {
-                InitializeSceneManager();
-            }
-            else
-            {
-                Debug.Log("Scene Management System will be created when entering Play Mode.");
-            }
-        }
-
-        [ContextMenu("Validate System Components")]
-        public void ValidateSystemComponents()
-        {
-            var allValid = true;
-            var report = "Scene Management System Validation Report:\n";
-
-            if (sceneManagerCore == null)
-            {
-                report += "⚠ SceneManagerCore: Missing\n";
-                allValid = false;
-            }
-            else
-            {
-                report += "✓ SceneManagerCore: OK\n";
-            }
-
-            if (settings.enableTransitions)
-            {
-                if (sceneTransition == null)
-                {
-                    report += "⚠ SceneTransition: Missing (but enabled in settings)\n";
-                    allValid = false;
-                }
-                else
-                {
-                    report += "✓ SceneTransition: OK\n";
-                }
-            }
-
-            if (settings.enablePreloading)
-            {
-                if (scenePreloader == null)
-                {
-                    report += "⚠ ScenePreloader: Missing (but enabled in settings)\n";
-                    allValid = false;
-                }
-                else
-                {
-                    report += "✓ ScenePreloader: OK\n";
-                }
-            }
-
-            if (sceneDataManager == null)
-            {
-                report += "⚠ SceneDataManager: Missing\n";
-                allValid = false;
-            }
-            else
-            {
-                report += "✓ SceneDataManager: OK\n";
-            }
-
-            if (settings.validateScenesOnLoad)
-            {
-                if (sceneValidator == null)
-                {
-                    report += "⚠ SceneValidator: Missing (but enabled in settings)\n";
-                    allValid = false;
-                }
-                else
-                {
-                    report += "✓ SceneValidator: OK\n";
-                }
-            }
-
-            if (sceneEvents == null)
-            {
-                report += "⚠ SceneEvents: Missing\n";
-                allValid = false;
-            }
-            else
-            {
-                report += "✓ SceneEvents: OK\n";
-            }
-
-            report += allValid ? "\n✅ All components are properly configured!" : "\n❌ Some components need attention.";
-            Debug.Log(report);
         }
     }
 }
