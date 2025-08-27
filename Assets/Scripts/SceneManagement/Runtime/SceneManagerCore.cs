@@ -16,9 +16,9 @@ namespace SceneManagement.Runtime
         [SerializeField] private bool preloadScenes;
         [SerializeField] private LoadSceneMode defaultLoadMode = LoadSceneMode.Single;
 
-        private Dictionary<string, Scene> loadedScenes = new Dictionary<string, Scene>();
-        private Dictionary<string, AsyncOperation> preloadedScenes = new Dictionary<string, AsyncOperation>();
-        private HashSet<string> scenesInTransition = new HashSet<string>();
+        private readonly Dictionary<string, Scene> loadedScenes = new();
+        private readonly Dictionary<string, AsyncOperation> preloadedScenes = new();
+        private readonly HashSet<string> scenesInTransition = new();
 
         public event Action<string> OnSceneLoadStarted;
         public event Action<string, Scene> OnSceneLoaded;
@@ -240,9 +240,9 @@ namespace SceneManagement.Runtime
 
         public void SetActiveScene(string sceneName)
         {
-            if (loadedScenes.ContainsKey(sceneName))
+            if (loadedScenes.TryGetValue(sceneName, out var scene))
             {
-                SceneManager.SetActiveScene(loadedScenes[sceneName]);
+                SceneManager.SetActiveScene(scene);
             }
         }
 

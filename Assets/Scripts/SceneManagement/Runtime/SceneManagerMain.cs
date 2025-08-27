@@ -23,7 +23,7 @@ namespace SceneManagement.Runtime
         [Header("Save/Load Settings")] public bool enableAutoSave = true;
         public float autoSaveInterval = 300f;
         public int maxAutoSaveSlots = 5;
-        public bool enableEncryption = false;
+        public bool enableEncryption;
     }
 
     public class SceneManagerMain : MonoBehaviour
@@ -49,7 +49,7 @@ namespace SceneManagement.Runtime
         public SceneValidator Validator => sceneValidator;
         public SceneEvents Events => sceneEvents;
 
-        private bool isInitialized = false;
+        private bool isInitialized;
 
         private void Awake()
         {

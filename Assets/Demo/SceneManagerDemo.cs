@@ -1,9 +1,9 @@
-using UnityEngine;
-using UnityEngine.UI;
 using System.Collections.Generic;
 using SceneManagement.Runtime;
+using UnityEngine;
+using UnityEngine.UI;
 
-namespace TechCore.SceneManagement
+namespace Demo
 {
     public class SceneManagerDemo : MonoBehaviour
     {

@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace SceneManagement.Runtime
 {
@@ -12,7 +14,7 @@ namespace SceneManagement.Runtime
         public string sceneName;
         public Vector3 playerPosition;
         public Quaternion playerRotation;
-        public Dictionary<string, object> customData = new Dictionary<string, object>();
+        public Dictionary<string, object> customData = new();
         public float timeStamp;
         public string checksum;
 
@@ -29,8 +31,8 @@ namespace SceneManagement.Runtime
         public string saveName;
         public DateTime saveTime;
         public string currentScene;
-        public Dictionary<string, SceneState> sceneStates = new Dictionary<string, SceneState>();
-        public Dictionary<string, object> globalGameData = new Dictionary<string, object>();
+        public Dictionary<string, SceneState> sceneStates = new();
+        public Dictionary<string, object> globalGameData = new();
         public string version = "1.0";
     }
 
@@ -51,18 +53,18 @@ namespace SceneManagement.Runtime
         [SerializeField] private bool autoSaveEnabled = true;
         [SerializeField] private float autoSaveInterval = 300f;
         [SerializeField] private int maxAutoSaveSlots = 5;
-        [SerializeField] private bool enableEncryption = false;
+        [SerializeField] private bool enableEncryption;
 
-        private Dictionary<string, SceneState> currentSceneStates = new Dictionary<string, SceneState>();
-        private Dictionary<string, object> globalGameData = new Dictionary<string, object>();
-        private float lastAutoSaveTime = 0f;
+        private Dictionary<string, SceneState> currentSceneStates = new();
+        private Dictionary<string, object> globalGameData = new();
+        private float lastAutoSaveTime;
         private string currentSaveName = "AutoSave";
 
-        public event System.Action<string> OnSaveStarted;
-        public event System.Action<string, bool> OnSaveCompleted;
-        public event System.Action<string> OnLoadStarted;
-        public event System.Action<string, bool> OnLoadCompleted;
-        public event System.Action<string> OnAutoSave;
+        public event Action<string> OnSaveStarted;
+        public event Action<string, bool> OnSaveCompleted;
+        public event Action<string> OnLoadStarted;
+        public event Action<string, bool> OnLoadCompleted;
+        public event Action<string> OnAutoSave;
 
         private void Awake()
         {
@@ -137,7 +139,7 @@ namespace SceneManagement.Runtime
                 File.WriteAllText(filePath, jsonData);
                 OnSaveCompleted?.Invoke(saveName, true);
             }
-            catch (System.Exception ex)
+            catch (Exception ex)
             {
                 Debug.LogError($"Failed to save game: {ex.Message}");
                 OnSaveCompleted?.Invoke(saveName, false);
@@ -184,14 +186,14 @@ namespace SceneManagement.Runtime
                     }
                     else
                     {
-                        UnityEngine.SceneManagement.SceneManager.LoadScene(saveData.currentScene);
+                        SceneManager.LoadScene(saveData.currentScene);
                     }
                 }
 
                 OnLoadCompleted?.Invoke(saveName, true);
                 return true;
             }
-            catch (System.Exception ex)
+            catch (Exception ex)
             {
                 Debug.LogError($"Failed to load game: {ex.Message}");
                 OnLoadCompleted?.Invoke(saveName, false);
@@ -230,7 +232,7 @@ namespace SceneManagement.Runtime
                         sceneState.customData[id] = objState;
                     }
                 }
-                catch (System.Exception ex)
+                catch (Exception ex)
                 {
                     Debug.LogError($"Failed to save state for persistent object: {ex.Message}");
                 }
@@ -243,10 +245,8 @@ namespace SceneManagement.Runtime
 
         public void LoadSceneState(string sceneName)
         {
-            if (!currentSceneStates.ContainsKey(sceneName))
+            if (!currentSceneStates.TryGetValue(sceneName, out var sceneState))
                 return;
-
-            SceneState sceneState = currentSceneStates[sceneName];
 
             if (!ValidateChecksum(sceneState))
             {
@@ -269,17 +269,16 @@ namespace SceneManagement.Runtime
             {
                 try
                 {
-                    string id = persistentObj.GetPersistentID();
-                    if (sceneState.customData.ContainsKey(id))
+                    var id = persistentObj.GetPersistentID();
+                    if (sceneState.customData.TryGetValue(id, out var data))
                     {
-                        var objData = sceneState.customData[id] as Dictionary<string, object>;
-                        if (objData != null)
+                        if (data is Dictionary<string, object> objData)
                         {
                             persistentObj.LoadState(objData);
                         }
                     }
                 }
-                catch (System.Exception ex)
+                catch (Exception ex)
                 {
                     Debug.LogError($"Failed to load state for persistent object: {ex.Message}");
                 }
@@ -293,13 +292,13 @@ namespace SceneManagement.Runtime
 
         public T GetGlobalData<T>(string key, T defaultValue = default(T))
         {
-            if (globalGameData.ContainsKey(key))
+            if (globalGameData.TryGetValue(key, out var data))
             {
                 try
                 {
-                    return (T)globalGameData[key];
+                    return (T)data;
                 }
-                catch (System.Exception)
+                catch (Exception)
                 {
                     return defaultValue;
                 }
@@ -322,7 +321,7 @@ namespace SceneManagement.Runtime
         {
             string savePath = Path.Combine(Application.persistentDataPath, saveDirectory);
             if (!Directory.Exists(savePath))
-                return new string[0];
+                return Array.Empty<string>();
 
             string[] files = Directory.GetFiles(savePath, "*.json");
             List<string> saveNames = new List<string>();
@@ -347,7 +346,7 @@ namespace SceneManagement.Runtime
                     return true;
                 }
             }
-            catch (System.Exception ex)
+            catch (Exception ex)
             {
                 Debug.LogError($"Failed to delete save {saveName}: {ex.Message}");
             }
@@ -405,7 +404,7 @@ namespace SceneManagement.Runtime
 
         private string GetCurrentSceneName()
         {
-            return UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+            return SceneManager.GetActiveScene().name;
         }
 
         private string GenerateChecksum(SceneState sceneState)
@@ -423,16 +422,16 @@ namespace SceneManagement.Runtime
 
         private string EncryptData(string data)
         {
-            return System.Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(data));
+            return Convert.ToBase64String(Encoding.UTF8.GetBytes(data));
         }
 
         private string DecryptData(string encryptedData)
         {
-            byte[] bytes = System.Convert.FromBase64String(encryptedData);
-            return System.Text.Encoding.UTF8.GetString(bytes);
+            byte[] bytes = Convert.FromBase64String(encryptedData);
+            return Encoding.UTF8.GetString(bytes);
         }
 
-        private void OnSceneLoadedCallback(string sceneName, UnityEngine.SceneManagement.Scene scene)
+        private void OnSceneLoadedCallback(string sceneName, Scene scene)
         {
             LoadSceneState(sceneName);
         }

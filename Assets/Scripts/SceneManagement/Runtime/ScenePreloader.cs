@@ -11,8 +11,8 @@ namespace SceneManagement.Runtime
     {
         public string sceneName;
         public bool autoPreload = true;
-        public float preloadDelay = 0f;
-        public int priority = 0;
+        public float preloadDelay;
+        public int priority;
     }
 
     public class ScenePreloader : MonoBehaviour
@@ -20,16 +20,16 @@ namespace SceneManagement.Runtime
         public static ScenePreloader Instance { get; private set; }
 
         [Header("Preload Configuration")] [SerializeField]
-        private List<PreloadSettings> preloadQueue = new List<PreloadSettings>();
+        private List<PreloadSettings> preloadQueue = new();
 
         [SerializeField] private int maxConcurrentPreloads = 3;
         [SerializeField] private bool preloadOnStart = true;
         [SerializeField] private bool enableSmartPreloading = true;
 
-        private Queue<PreloadSettings> pendingPreloads = new Queue<PreloadSettings>();
-        private HashSet<string> currentlyPreloading = new HashSet<string>();
-        private Dictionary<string, float> sceneUsageFrequency = new Dictionary<string, float>();
-        private Dictionary<string, DateTime> lastAccessTime = new Dictionary<string, DateTime>();
+        private readonly Queue<PreloadSettings> pendingPreloads = new();
+        private readonly HashSet<string> currentlyPreloading = new();
+        private Dictionary<string, float> sceneUsageFrequency = new();
+        private readonly Dictionary<string, DateTime> lastAccessTime = new();
 
         public event Action<string> OnPreloadStarted;
         public event Action<string> OnPreloadCompleted;
@@ -235,12 +235,12 @@ namespace SceneManagement.Runtime
 
         private float CalculatePreloadScore(string sceneName)
         {
-            float frequencyScore = sceneUsageFrequency.ContainsKey(sceneName) ? sceneUsageFrequency[sceneName] : 0f;
+            var frequencyScore = sceneUsageFrequency.GetValueOrDefault(sceneName, 0f);
 
-            float recencyScore = 0f;
-            if (lastAccessTime.ContainsKey(sceneName))
+            var recencyScore = 0f;
+            if (lastAccessTime.TryGetValue(sceneName, out var time))
             {
-                TimeSpan timeSinceAccess = DateTime.Now - lastAccessTime[sceneName];
+                var timeSinceAccess = DateTime.Now - time;
                 recencyScore = Mathf.Max(0f, 1f - (float)(timeSinceAccess.TotalHours / 24f));
             }
 
@@ -255,13 +255,9 @@ namespace SceneManagement.Runtime
 
         private void UpdateSceneUsage(string sceneName)
         {
-            if (sceneUsageFrequency.ContainsKey(sceneName))
+            if (!sceneUsageFrequency.TryAdd(sceneName, 1f))
             {
                 sceneUsageFrequency[sceneName]++;
-            }
-            else
-            {
-                sceneUsageFrequency[sceneName] = 1f;
             }
 
             lastAccessTime[sceneName] = DateTime.Now;
@@ -293,7 +289,7 @@ namespace SceneManagement.Runtime
             try
             {
                 SceneUsageData data = JsonUtility.FromJson<SceneUsageData>(json);
-                if (data != null && data.usageFrequency != null)
+                if (data is { usageFrequency: not null })
                 {
                     sceneUsageFrequency = data.usageFrequency;
                 }
@@ -352,6 +348,6 @@ namespace SceneManagement.Runtime
     [Serializable]
     public class SceneUsageData
     {
-        public Dictionary<string, float> usageFrequency = new Dictionary<string, float>();
+        public Dictionary<string, float> usageFrequency = new();
     }
 }

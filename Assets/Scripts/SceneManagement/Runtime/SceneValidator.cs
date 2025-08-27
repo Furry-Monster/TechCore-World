@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -72,16 +73,15 @@ namespace SceneManagement.Runtime
         [SerializeField] private bool blockLoadOnCriticalErrors = true;
 
         [Header("Validation Rules")] [SerializeField]
-        private List<SceneValidationRule> validationRules = new List<SceneValidationRule>();
+        private List<SceneValidationRule> validationRules = new();
 
-        private Dictionary<string, List<ValidationResult>> validationHistory =
-            new Dictionary<string, List<ValidationResult>>();
+        private readonly Dictionary<string, List<ValidationResult>> validationHistory = new();
 
-        private HashSet<string> validatedScenes = new HashSet<string>();
+        private readonly HashSet<string> validatedScenes = new();
 
-        public event System.Action<string, List<ValidationResult>> OnSceneValidated;
-        public event System.Action<string, ValidationResult> OnValidationFailed;
-        public event System.Action<string> OnCriticalValidationError;
+        public event Action<string, List<ValidationResult>> OnSceneValidated;
+        public event Action<string, ValidationResult> OnValidationFailed;
+        public event Action<string> OnCriticalValidationError;
 
         private void Awake()
         {
@@ -112,7 +112,7 @@ namespace SceneManagement.Runtime
         {
             if (validationRules.Count == 0)
             {
-                validationRules.AddRange(new SceneValidationRule[]
+                validationRules.AddRange(new[]
                 {
                     new SceneValidationRule
                     {
@@ -223,7 +223,7 @@ namespace SceneManagement.Runtime
                             ValidationSeverity.Error, $"Unknown validation type: {rule.validationType}");
                 }
             }
-            catch (System.Exception ex)
+            catch (Exception ex)
             {
                 return new ValidationResult(sceneName, rule.ruleName, false,
                     ValidationSeverity.Error, $"Validation error: {ex.Message}", ex.StackTrace);
@@ -234,8 +234,8 @@ namespace SceneManagement.Runtime
         {
             for (int i = 0; i < SceneManager.sceneCountInBuildSettings; i++)
             {
-                string scenePath = SceneUtility.GetScenePathByBuildIndex(i);
-                string name = System.IO.Path.GetFileNameWithoutExtension(scenePath);
+                var scenePath = SceneUtility.GetScenePathByBuildIndex(i);
+                var name = Path.GetFileNameWithoutExtension(scenePath);
 
                 if (name == sceneName)
                 {
@@ -473,10 +473,10 @@ namespace SceneManagement.Runtime
 
         public bool HasCriticalErrors(string sceneName)
         {
-            if (!validationHistory.ContainsKey(sceneName))
+            if (!validationHistory.TryGetValue(sceneName, out var results))
                 return false;
 
-            foreach (var result in validationHistory[sceneName])
+            foreach (var result in results)
             {
                 if (!result.passed && result.severity == ValidationSeverity.Critical)
                     return true;
@@ -492,8 +492,8 @@ namespace SceneManagement.Runtime
 
         public List<ValidationResult> GetValidationHistory(string sceneName)
         {
-            return validationHistory.ContainsKey(sceneName)
-                ? new List<ValidationResult>(validationHistory[sceneName])
+            return validationHistory.TryGetValue(sceneName, out var result)
+                ? new List<ValidationResult>(result)
                 : new List<ValidationResult>();
         }
 
@@ -510,12 +510,12 @@ namespace SceneManagement.Runtime
             validationRules.RemoveAll(r => r.ruleName == ruleName);
         }
 
-        public void EnableRule(string ruleName, bool enabled)
+        public void EnableRule(string ruleName, bool ruleEnabled)
         {
             var rule = validationRules.Find(r => r.ruleName == ruleName);
             if (rule != null)
             {
-                rule.isEnabled = enabled;
+                rule.isEnabled = ruleEnabled;
             }
         }
 

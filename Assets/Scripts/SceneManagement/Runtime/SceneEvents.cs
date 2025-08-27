@@ -1,7 +1,9 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Events;
+using UnityEngine.SceneManagement;
 
 namespace SceneManagement.Runtime
 {
@@ -11,7 +13,7 @@ namespace SceneManagement.Runtime
     }
 
     [Serializable]
-    public class SceneLoadEvent : UnityEvent<string, UnityEngine.SceneManagement.Scene>
+    public class SceneLoadEvent : UnityEvent<string, Scene>
     {
     }
 
@@ -78,20 +80,18 @@ namespace SceneManagement.Runtime
         public SceneTransitionEvent OnAnyTransitionStarted;
         public SceneTransitionEvent OnAnyTransitionCompleted;
 
-        private Dictionary<string, List<System.Action<string>>> sceneSpecificCallbacks =
-            new Dictionary<string, List<System.Action<string>>>();
+        private readonly Dictionary<string, List<Action<string>>> sceneSpecificCallbacks = new();
 
-        private Dictionary<SceneEventType, List<System.Action<string, object[]>>> globalCallbacks =
-            new Dictionary<SceneEventType, List<System.Action<string, object[]>>>();
+        private readonly Dictionary<SceneEventType, List<Action<string, object[]>>> globalCallbacks = new();
 
-        private Queue<SceneEventData> eventQueue = new Queue<SceneEventData>();
-        private bool isProcessingEvents = false;
+        private readonly Queue<SceneEventData> eventQueue = new();
+        private bool isProcessingEvents;
 
         [Header("Event Settings")] [SerializeField]
         private bool processEventsAsync = true;
 
         [SerializeField] private int maxEventsPerFrame = 10;
-        [SerializeField] private bool logEvents = false;
+        [SerializeField] private bool logEvents;
 
         private struct SceneEventData
         {
@@ -131,11 +131,11 @@ namespace SceneManagement.Runtime
 
         private void InitializeCallbackDictionaries()
         {
-            foreach (SceneEventType eventType in System.Enum.GetValues(typeof(SceneEventType)))
+            foreach (SceneEventType eventType in Enum.GetValues(typeof(SceneEventType)))
             {
                 if (eventType != SceneEventType.None && eventType != SceneEventType.All)
                 {
-                    globalCallbacks[eventType] = new List<System.Action<string, object[]>>();
+                    globalCallbacks[eventType] = new List<Action<string, object[]>>();
                 }
             }
         }
@@ -200,7 +200,7 @@ namespace SceneManagement.Runtime
             }
         }
 
-        private System.Collections.IEnumerator ProcessEventQueue()
+        private IEnumerator ProcessEventQueue()
         {
             isProcessingEvents = true;
             int eventsProcessed = 0;
@@ -245,9 +245,9 @@ namespace SceneManagement.Runtime
                         break;
 
                     case SceneEventType.LoadCompleted:
-                        if (parameters.Length > 0 && parameters[0] is UnityEngine.SceneManagement.Scene)
+                        if (parameters.Length > 0 && parameters[0] is Scene)
                         {
-                            OnAnySceneLoaded?.Invoke(sceneName, (UnityEngine.SceneManagement.Scene)parameters[0]);
+                            OnAnySceneLoaded?.Invoke(sceneName, (Scene)parameters[0]);
                         }
 
                         break;
@@ -285,7 +285,7 @@ namespace SceneManagement.Runtime
                         break;
                 }
             }
-            catch (System.Exception ex)
+            catch (Exception ex)
             {
                 Debug.LogError($"[SceneEvents] Error invoking global events: {ex.Message}");
             }
@@ -314,10 +314,10 @@ namespace SceneManagement.Runtime
                             break;
 
                         case SceneEventType.LoadCompleted:
-                            if (parameters.Length > 0 && parameters[0] is UnityEngine.SceneManagement.Scene)
+                            if (parameters.Length > 0 && parameters[0] is Scene)
                             {
                                 listener.onSceneLoadEvent?.Invoke(sceneName,
-                                    (UnityEngine.SceneManagement.Scene)parameters[0]);
+                                    (Scene)parameters[0]);
                             }
 
                             break;
@@ -344,7 +344,7 @@ namespace SceneManagement.Runtime
                             break;
                     }
                 }
-                catch (System.Exception ex)
+                catch (Exception ex)
                 {
                     Debug.LogError(
                         $"[SceneEvents] Error invoking event listener '{listener.listenerName}': {ex.Message}");
@@ -354,16 +354,15 @@ namespace SceneManagement.Runtime
 
         private void InvokeGlobalCallbacks(SceneEventType eventType, string sceneName, object[] parameters)
         {
-            if (globalCallbacks.ContainsKey(eventType))
+            if (globalCallbacks.TryGetValue(eventType, out var callbacks))
             {
-                var callbacks = globalCallbacks[eventType];
-                for (int i = callbacks.Count - 1; i >= 0; i--)
+                for (var i = callbacks.Count - 1; i >= 0; i--)
                 {
                     try
                     {
                         callbacks[i]?.Invoke(sceneName, parameters);
                     }
-                    catch (System.Exception ex)
+                    catch (Exception ex)
                     {
                         Debug.LogError($"[SceneEvents] Error invoking global callback: {ex.Message}");
                         callbacks.RemoveAt(i);
@@ -374,16 +373,15 @@ namespace SceneManagement.Runtime
 
         private void InvokeSceneSpecificCallbacks(string sceneName)
         {
-            if (sceneSpecificCallbacks.ContainsKey(sceneName))
+            if (sceneSpecificCallbacks.TryGetValue(sceneName, out var callbacks))
             {
-                var callbacks = sceneSpecificCallbacks[sceneName];
-                for (int i = callbacks.Count - 1; i >= 0; i--)
+                for (var i = callbacks.Count - 1; i >= 0; i--)
                 {
                     try
                     {
                         callbacks[i]?.Invoke(sceneName);
                     }
-                    catch (System.Exception ex)
+                    catch (Exception ex)
                     {
                         Debug.LogError($"[SceneEvents] Error invoking scene-specific callback: {ex.Message}");
                         callbacks.RemoveAt(i);
@@ -392,44 +390,45 @@ namespace SceneManagement.Runtime
             }
         }
 
-        public void Subscribe(SceneEventType eventType, System.Action<string, object[]> callback)
+        public void Subscribe(SceneEventType eventType, Action<string, object[]> callback)
         {
             if (callback == null) return;
 
             if (!globalCallbacks.ContainsKey(eventType))
             {
-                globalCallbacks[eventType] = new List<System.Action<string, object[]>>();
+                globalCallbacks[eventType] = new List<Action<string, object[]>>();
             }
 
             globalCallbacks[eventType].Add(callback);
         }
 
-        public void Unsubscribe(SceneEventType eventType, System.Action<string, object[]> callback)
+        public void Unsubscribe(SceneEventType eventType, Action<string, object[]> callback)
         {
-            if (callback == null || !globalCallbacks.ContainsKey(eventType)) return;
+            if (callback == null || !globalCallbacks.TryGetValue(eventType, out var globalCallback))
+                return;
 
-            globalCallbacks[eventType].Remove(callback);
+            globalCallback.Remove(callback);
         }
 
-        public void SubscribeToScene(string sceneName, System.Action<string> callback)
+        public void SubscribeToScene(string sceneName, Action<string> callback)
         {
             if (string.IsNullOrEmpty(sceneName) || callback == null) return;
 
             if (!sceneSpecificCallbacks.ContainsKey(sceneName))
             {
-                sceneSpecificCallbacks[sceneName] = new List<System.Action<string>>();
+                sceneSpecificCallbacks[sceneName] = new List<Action<string>>();
             }
 
             sceneSpecificCallbacks[sceneName].Add(callback);
         }
 
-        public void UnsubscribeFromScene(string sceneName, System.Action<string> callback)
+        public void UnsubscribeFromScene(string sceneName, Action<string> callback)
         {
             if (string.IsNullOrEmpty(sceneName) || callback == null) return;
 
-            if (sceneSpecificCallbacks.ContainsKey(sceneName))
+            if (sceneSpecificCallbacks.TryGetValue(sceneName, out var specificCallback))
             {
-                sceneSpecificCallbacks[sceneName].Remove(callback);
+                specificCallback.Remove(callback);
             }
         }
 
@@ -446,12 +445,12 @@ namespace SceneManagement.Runtime
             eventListeners.RemoveAll(l => l.listenerName == listenerName);
         }
 
-        public void EnableEventListener(string listenerName, bool enabled)
+        public void EnableEventListener(string listenerName, bool listenerEnabled)
         {
             var listener = eventListeners.Find(l => l.listenerName == listenerName);
             if (listener != null)
             {
-                listener.isEnabled = enabled;
+                listener.isEnabled = listenerEnabled;
             }
         }
 
@@ -473,7 +472,7 @@ namespace SceneManagement.Runtime
             TriggerEvent(SceneEventType.LoadStarted, sceneName);
         }
 
-        private void OnSceneLoadedCallback(string sceneName, UnityEngine.SceneManagement.Scene scene)
+        private void OnSceneLoadedCallback(string sceneName, Scene scene)
         {
             TriggerEvent(SceneEventType.LoadCompleted, sceneName, scene);
         }

@@ -179,8 +179,8 @@ namespace SceneManagement.Runtime
                 UpdateLoadingText(0);
             }
 
-            bool sceneLoadCompleted = false;
-            float loadProgress = 0f;
+            var sceneLoadCompleted = false;
+            var loadProgress = 0f;
 
             if (SceneManagerCore.Instance != null)
             {
@@ -316,7 +316,7 @@ namespace SceneManagement.Runtime
 
         public void SetLoadingMessages(string[] messages)
         {
-            if (messages != null && messages.Length > 0)
+            if (messages is { Length: > 0 })
             {
                 loadingMessages = messages;
             }
