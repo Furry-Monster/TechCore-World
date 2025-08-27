@@ -2,7 +2,7 @@ Unity场景管理器系统 - 架构设计与功能说明
 
 📋 系统概述
 
-这是一个基于Unity的企业级场景管理系统，采用模块化架构设计，提供完整的场景生命周期管理、数据持久化、性能优化和用户体验增强功能。
+这是一个基于Unity的轻量级场景管理系统，采用模块化架构设计，提供完整的场景生命周期管理、性能优化和用户体验增强功能。
 
 🏗️ 核心架构
 
@@ -22,8 +22,7 @@ Unity场景管理器系统 - 架构设计与功能说明
 ├─────────────────────────────────────┤
 │ 核心层 │
 │ SceneManagerCore | SceneTransition │
-│ ScenePreloader | SceneDataManager │
-│ SceneValidator | SceneEvents │
+│ ScenePreloader | SceneEvents     │
 ├─────────────────────────────────────┤
 │ Unity引擎层 (SceneManager)           │
 └─────────────────────────────────────┘
@@ -66,16 +65,7 @@ Unity场景管理器系统 - 架构设计与功能说明
     - 📈 统计分析: 场景使用模式的数据收集和分析
     - 🎯 优先级管理: 支持基于优先级的预加载队列
 
-5. SceneDataManager - 数据持久化
-
-   职责: 游戏存档和场景状态的持久化管理
-
-    - 💾 存档系统: 完整的游戏存档保存/加载功能
-    - 🔄 状态管理: 场景对象状态的自动保存和恢复
-    - 🔐 数据安全: 可选的数据加密保护
-    - ⏰ 自动保存: 可配置的定时自动保存机制
-
-6. SceneValidator - 场景验证
+5. SceneValidator - 场景验证
 
    职责: 确保场景完整性和质量
 
@@ -84,7 +74,7 @@ Unity场景管理器系统 - 架构设计与功能说明
     - 🛡️ 质量保证: 可配置的质量检查规则
     - 📊 报告系统: 详细的验证结果报告
 
-7. SceneEvents - 事件通信系统
+6. SceneEvents - 事件通信系统
 
    职责: 提供解耦的事件通信机制
 
@@ -103,8 +93,7 @@ B --> C[SceneValidator验证]
 C --> D[SceneTransition开始过渡]
 D --> E[SceneManagerCore异步加载]
 E --> F[SceneEvents事件通知]
-F --> G[SceneDataManager恢复状态]
-G --> H[SceneTransition完成过渡]
+F --> G[SceneTransition完成过渡]
 
 事件通信架构
 
@@ -167,34 +156,28 @@ SceneManagerSettings 配置项
 - validateScenesOnLoad: 加载时验证场景
 - blockLoadOnCriticalErrors: 关键错误时阻止加载
 
-[Header("Save/Load Settings")]
-
-- enableAutoSave: 启用自动保存
-- autoSaveInterval: 自动保存间隔
-- maxAutoSaveSlots: 最大自动保存槽位数
-- enableEncryption: 启用数据加密
 
 🎯 使用场景
 
 适用项目类型
 
-- 大型RPG游戏: 需要复杂存档和场景管理
-- 开放世界游戏: 需要无缝场景切换
+- 各类Unity游戏: 需要可靠的场景切换功能
+- 开放世界游戏: 需要无缝场景切换和预加载
 - 教育应用: 需要稳定的场景管理
-- 企业应用: 需要可靠的数据持久化
+- 移动应用: 需要优化的场景加载性能
 
 扩展点
 
 - 自定义验证规则: 实现 IValidationRule 接口
-- 自定义存档格式: 实现 ISceneStatePersistent 接口
 - 自定义过渡效果: 继承 SceneTransition 类
 - 自定义事件处理: 订阅 SceneEvents 事件
+- 自定义预加载策略: 扩展 ScenePreloader 功能
 
 📈 性能指标
 
 - 场景加载速度: 相比原生提升30-50%
-- 内存使用: 通过预加载减少20-40%峰值内存
-- 用户体验: 无感知的场景切换体验
+- 内存使用: 通过智能预加载优化内存分配
+- 用户体验: 平滑的场景切换体验
 - 开发效率: 减少70%的场景管理相关代码
 
 🔮 技术亮点
@@ -206,4 +189,4 @@ SceneManagerSettings 配置项
 5. 易于测试: 解耦设计便于单元测试
 6. 文档完善: 详细的代码注释和使用文档
 
-这个场景管理器系统代表了Unity场景管理的最佳实践，为游戏开发提供了一个稳定、高效、易用的场景管理解决方案。
+这个轻量级场景管理器系统专注于核心场景管理功能，为Unity开发提供了一个稳定、高效、易用的场景切换解决方案。

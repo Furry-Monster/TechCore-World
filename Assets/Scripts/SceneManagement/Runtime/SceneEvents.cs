@@ -1,5 +1,4 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Events;
@@ -64,34 +63,30 @@ namespace SceneManagement.Runtime
         public SceneTransitionEvent onSceneTransitionEvent;
     }
 
-    public class SceneEvents : MonoBehaviour
+    public class SceneEvents
     {
-        public static SceneEvents Instance { get; private set; }
+        private static SceneEvents instance;
+        public static SceneEvents Instance => instance ??= new SceneEvents();
 
-        [Header("Event Listeners")] [SerializeField]
         private List<SceneEventListener> eventListeners = new List<SceneEventListener>();
 
-        [Header("Global Events")] public SceneEvent OnAnySceneLoadStarted;
-        public SceneLoadEvent OnAnySceneLoaded;
-        public SceneEvent OnAnySceneUnloadStarted;
-        public SceneEvent OnAnySceneUnloaded;
-        public SceneProgressEvent OnAnySceneProgress;
-        public SceneErrorEvent OnAnySceneError;
-        public SceneTransitionEvent OnAnyTransitionStarted;
-        public SceneTransitionEvent OnAnyTransitionCompleted;
+        public SceneEvent OnAnySceneLoadStarted = new();
+        public SceneLoadEvent OnAnySceneLoaded = new();
+        public SceneEvent OnAnySceneUnloadStarted = new();
+        public SceneEvent OnAnySceneUnloaded = new();
+        public SceneProgressEvent OnAnySceneProgress = new();
+        public SceneErrorEvent OnAnySceneError = new();
+        public SceneTransitionEvent OnAnyTransitionStarted = new();
+        public SceneTransitionEvent OnAnyTransitionCompleted = new();
 
         private readonly Dictionary<string, List<Action<string>>> sceneSpecificCallbacks = new();
-
         private readonly Dictionary<SceneEventType, List<Action<string, object[]>>> globalCallbacks = new();
 
         private readonly Queue<SceneEventData> eventQueue = new();
         private bool isProcessingEvents;
-
-        [Header("Event Settings")] [SerializeField]
         private bool processEventsAsync = true;
-
-        [SerializeField] private int maxEventsPerFrame = 10;
-        [SerializeField] private bool logEvents;
+        private int maxEventsPerFrame = 10;
+        private bool logEvents;
 
         private struct SceneEventData
         {
@@ -101,32 +96,15 @@ namespace SceneManagement.Runtime
             public DateTime timestamp;
         }
 
-        private void Awake()
-        {
-            if (Instance == null)
-            {
-                Instance = this;
-                DontDestroyOnLoad(gameObject);
-                Initialize();
-            }
-            else
-            {
-                Destroy(gameObject);
-            }
-        }
-
-        private void Initialize()
+        private SceneEvents()
         {
             InitializeCallbackDictionaries();
-            SubscribeToSceneManagerEvents();
         }
 
-        private void Update()
+        public void Initialize(SceneManagerCore coreManager, SceneTransition transition,
+            ScenePreloader preloader, SceneValidator validator)
         {
-            if (processEventsAsync && eventQueue.Count > 0 && !isProcessingEvents)
-            {
-                StartCoroutine(ProcessEventQueue());
-            }
+            SubscribeToComponents(coreManager, transition, preloader, validator);
         }
 
         private void InitializeCallbackDictionaries()
@@ -140,33 +118,43 @@ namespace SceneManagement.Runtime
             }
         }
 
-        private void SubscribeToSceneManagerEvents()
+        private void SubscribeToComponents(SceneManagerCore coreManager, SceneTransition transition,
+            ScenePreloader preloader, SceneValidator validator)
         {
-            if (SceneManagerCore.Instance != null)
+            if (coreManager != null)
             {
-                SceneManagerCore.Instance.OnSceneLoadStarted += OnSceneLoadStartedCallback;
-                SceneManagerCore.Instance.OnSceneLoaded += OnSceneLoadedCallback;
-                SceneManagerCore.Instance.OnSceneUnloadStarted += OnSceneUnloadStartedCallback;
-                SceneManagerCore.Instance.OnSceneUnloaded += OnSceneUnloadedCallback;
-                SceneManagerCore.Instance.OnSceneLoadProgress += OnSceneLoadProgressCallback;
-                SceneManagerCore.Instance.OnSceneLoadFailed += OnSceneLoadFailedCallback;
+                coreManager.OnSceneLoadStarted += OnSceneLoadStartedCallback;
+                coreManager.OnSceneLoaded += OnSceneLoadedCallback;
+                coreManager.OnSceneUnloadStarted += OnSceneUnloadStartedCallback;
+                coreManager.OnSceneUnloaded += OnSceneUnloadedCallback;
+                coreManager.OnSceneLoadProgress += OnSceneLoadProgressCallback;
+                coreManager.OnSceneLoadFailed += OnSceneLoadFailedCallback;
             }
 
-            if (SceneTransition.Instance != null)
+            if (transition != null)
             {
-                SceneTransition.Instance.OnTransitionStarted += OnTransitionStartedCallback;
-                SceneTransition.Instance.OnTransitionCompleted += OnTransitionCompletedCallback;
+                transition.OnTransitionStarted += OnTransitionStartedCallback;
+                transition.OnTransitionCompleted += OnTransitionCompletedCallback;
             }
 
-            if (ScenePreloader.Instance != null)
+            if (preloader != null)
             {
-                ScenePreloader.Instance.OnPreloadStarted += OnPreloadStartedCallback;
-                ScenePreloader.Instance.OnPreloadCompleted += OnPreloadCompletedCallback;
+                preloader.OnPreloadStarted += OnPreloadStartedCallback;
+                preloader.OnPreloadCompleted += OnPreloadCompletedCallback;
             }
 
-            if (SceneValidator.Instance != null)
+            if (validator != null)
             {
-                SceneValidator.Instance.OnSceneValidated += OnSceneValidatedCallback;
+                validator.OnSceneValidated += OnSceneValidatedCallback;
+            }
+        }
+
+        // 需要外部驱动的更新方法
+        public void Update()
+        {
+            if (processEventsAsync && eventQueue.Count > 0 && !isProcessingEvents)
+            {
+                ProcessEventQueueSync();
             }
         }
 
@@ -200,7 +188,7 @@ namespace SceneManagement.Runtime
             }
         }
 
-        private IEnumerator ProcessEventQueue()
+        private void ProcessEventQueueSync()
         {
             isProcessingEvents = true;
             var eventsProcessed = 0;
@@ -210,12 +198,6 @@ namespace SceneManagement.Runtime
                 var eventData = eventQueue.Dequeue();
                 ProcessEvent(eventData.eventType, eventData.sceneName, eventData.parameters);
                 eventsProcessed++;
-
-                if (eventsProcessed >= maxEventsPerFrame)
-                {
-                    yield return null;
-                    eventsProcessed = 0;
-                }
             }
 
             isProcessingEvents = false;
@@ -316,8 +298,7 @@ namespace SceneManagement.Runtime
                         case SceneEventType.LoadCompleted:
                             if (parameters.Length > 0 && parameters[0] is Scene)
                             {
-                                listener.onSceneLoadEvent?.Invoke(sceneName,
-                                    (Scene)parameters[0]);
+                                listener.onSceneLoadEvent?.Invoke(sceneName, (Scene)parameters[0]);
                             }
 
                             break;
@@ -467,6 +448,14 @@ namespace SceneManagement.Runtime
             }
         }
 
+        public void SetEventSettings(bool asyncProcessing, int maxEvents, bool logging)
+        {
+            processEventsAsync = asyncProcessing;
+            maxEventsPerFrame = maxEvents;
+            logEvents = logging;
+        }
+
+        // 事件回调方法
         private void OnSceneLoadStartedCallback(string sceneName)
         {
             TriggerEvent(SceneEventType.LoadStarted, sceneName);
@@ -520,13 +509,6 @@ namespace SceneManagement.Runtime
         private void OnSceneValidatedCallback(string sceneName, List<ValidationResult> results)
         {
             TriggerEvent(SceneEventType.ValidationCompleted, sceneName, results);
-        }
-
-        public void SetEventSettings(bool asyncProcessing, int maxEvents, bool logging)
-        {
-            processEventsAsync = asyncProcessing;
-            maxEventsPerFrame = maxEvents;
-            logEvents = logging;
         }
     }
 }

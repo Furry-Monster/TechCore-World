@@ -6,25 +6,24 @@ namespace SceneManagement.Runtime
     [Serializable]
     public class SceneManagerSettings
     {
-        [Header("Core Settings")] public bool autoInitialize = true;
+        [Header("Core Settings")] 
+        public bool autoInitialize = true;
         public bool enableLogging = true;
         public bool persistAcrossScenes = true;
 
-        [Header("Loading Settings")] public bool useAsyncLoading = true;
+        [Header("Loading Settings")] 
+        public bool useAsyncLoading = true;
         public bool enablePreloading = true;
         public int maxConcurrentPreloads = 3;
 
-        [Header("Transition Settings")] public bool enableTransitions = true;
+        [Header("Transition Settings")] 
+        public bool enableTransitions = true;
         public float defaultTransitionDuration = 1.0f;
         public bool showLoadingScreen = true;
 
-        [Header("Validation Settings")] public bool validateScenesOnLoad = true;
+        [Header("Validation Settings")] 
+        public bool validateScenesOnLoad = true;
         public bool blockLoadOnCriticalErrors = true;
-
-        [Header("Save/Load Settings")] public bool enableAutoSave = true;
-        public float autoSaveInterval = 300f;
-        public int maxAutoSaveSlots = 5;
-        public bool enableEncryption;
     }
 
     public class SceneManagerMain : MonoBehaviour
@@ -47,24 +46,23 @@ namespace SceneManagement.Runtime
             }
         }
 
-        [Header("Component References")] [SerializeField]
+        // MonoBehaviour组件（需要Unity生命周期的）
         private SceneManagerCore sceneManagerCore;
+        private SceneTransition sceneTransition;
 
-        [SerializeField] private SceneTransition sceneTransition;
-        [SerializeField] private ScenePreloader scenePreloader;
-        [SerializeField] private SceneDataManager sceneDataManager;
-        [SerializeField] private SceneValidator sceneValidator;
-        [SerializeField] private SceneEvents sceneEvents;
+        // 纯C#类组件（手动管理的）
+        private ScenePreloader scenePreloader;
+        private SceneEvents sceneEvents;
+        private SceneValidator sceneValidator;
 
+        // 公共访问器
         public SceneManagerCore SceneManager => sceneManagerCore;
         public SceneTransition Transition => sceneTransition;
         public ScenePreloader Preloader => scenePreloader;
-        public SceneDataManager DataManager => sceneDataManager;
         public SceneValidator Validator => sceneValidator;
         public SceneEvents Events => sceneEvents;
 
         public bool IsInitialized { get; private set; }
-
 
         private void Awake()
         {
@@ -88,6 +86,12 @@ namespace SceneManagement.Runtime
             }
         }
 
+        private void Update()
+        {
+            // 驱动纯C#类的更新
+            sceneEvents?.Update();
+        }
+
         public void InitializeSceneManager()
         {
             if (IsInitialized)
@@ -101,7 +105,8 @@ namespace SceneManagement.Runtime
                 Debug.Log("[SceneManagerMain] Initializing Scene Management System...");
             }
 
-            CreateOrFindComponents();
+            CreateOrFindMonoBehaviourComponents();
+            InitializePureCSharpComponents();
             ConfigureComponents();
 
             IsInitialized = true;
@@ -112,51 +117,65 @@ namespace SceneManagement.Runtime
             }
         }
 
-        private void CreateOrFindComponents()
+        private void CreateOrFindMonoBehaviourComponents()
         {
+            // 核心组件（必须有）
             sceneManagerCore ??= GetComponent<SceneManagerCore>()
                                  ?? gameObject.AddComponent<SceneManagerCore>();
 
+            // 过渡组件（可选）
             if (settings.enableTransitions)
             {
                 sceneTransition ??= GetComponent<SceneTransition>()
                                     ?? gameObject.AddComponent<SceneTransition>();
             }
+        }
 
-            if (settings.enablePreloading)
-            {
-                scenePreloader ??= GetComponent<ScenePreloader>()
-                                   ?? gameObject.AddComponent<ScenePreloader>();
-            }
+        private void InitializePureCSharpComponents()
+        {
+            // 初始化纯C#类组件
+            scenePreloader = ScenePreloader.Instance;
+            sceneEvents = SceneEvents.Instance;
+            sceneValidator = SceneValidator.Instance;
 
-            sceneDataManager ??= GetComponent<SceneDataManager>()
-                                 ?? gameObject.AddComponent<SceneDataManager>();
-
+            // 设置组件间的依赖关系
+            scenePreloader.Initialize(sceneManagerCore);
+            sceneEvents.Initialize(sceneManagerCore, sceneTransition, scenePreloader, sceneValidator);
+            
             if (settings.validateScenesOnLoad)
             {
-                sceneValidator ??= GetComponent<SceneValidator>()
-                                   ?? gameObject.AddComponent<SceneValidator>();
+                sceneValidator.Initialize(
+                    settings.validateScenesOnLoad,
+                    true,
+                    settings.enableLogging,
+                    settings.blockLoadOnCriticalErrors
+                );
             }
-
-            sceneEvents ??= GetComponent<SceneEvents>()
-                            ?? gameObject.AddComponent<SceneEvents>();
         }
 
         private void ConfigureComponents()
         {
-            scenePreloader?.SetMaxConcurrentPreloads(settings.maxConcurrentPreloads);
-            scenePreloader?.EnableSmartPreloading(settings.enablePreloading);
+            // 配置预加载器
+            if (scenePreloader != null)
+            {
+                scenePreloader.Configure(
+                    settings.maxConcurrentPreloads,
+                    settings.enablePreloading
+                );
+            }
 
-            sceneDataManager?.EnableAutoSave(settings.enableAutoSave);
-            sceneDataManager?.SetAutoSaveInterval(settings.autoSaveInterval);
+            // 配置验证器
+            if (sceneValidator != null && settings.validateScenesOnLoad)
+            {
+                sceneValidator.Configure(
+                    validation: settings.validateScenesOnLoad,
+                    autoValidate: true,
+                    logging: settings.enableLogging,
+                    blockOnCritical: settings.blockLoadOnCriticalErrors
+                );
+            }
 
-            sceneValidator?.SetValidationSettings(
-                settings.validateScenesOnLoad,
-                true,
-                settings.enableLogging,
-                settings.blockLoadOnCriticalErrors
-            );
-
+            // 配置事件系统
             sceneEvents?.SetEventSettings(true, 10, settings.enableLogging);
         }
 
@@ -203,36 +222,6 @@ namespace SceneManagement.Runtime
             }
         }
 
-        public void SaveGame(string saveName = null)
-        {
-            if (!IsInitialized)
-            {
-                Debug.LogError("SceneManagerMain is not initialized!");
-                return;
-            }
-
-            if (sceneDataManager != null)
-            {
-                sceneDataManager.SaveGame(saveName);
-            }
-        }
-
-        public bool LoadGame(string saveName)
-        {
-            if (!IsInitialized)
-            {
-                Debug.LogError("SceneManagerMain is not initialized!");
-                return false;
-            }
-
-            if (sceneDataManager != null)
-            {
-                return sceneDataManager.LoadGame(saveName);
-            }
-
-            return false;
-        }
-
         public void ValidateCurrentScene()
         {
             if (!IsInitialized)
@@ -255,6 +244,11 @@ namespace SceneManagement.Runtime
                 sceneEvents.ClearAllCallbacks();
             }
 
+            if (scenePreloader != null)
+            {
+                scenePreloader.Shutdown();
+            }
+
             IsInitialized = false;
 
             if (settings.enableLogging)
@@ -270,6 +264,22 @@ namespace SceneManagement.Runtime
 
             Shutdown();
             Instance = null;
+        }
+
+        // 配置API
+        public void ConfigurePreloader(int maxConcurrent, bool smartPreloading = true, System.Collections.Generic.List<PreloadSettings> initialQueue = null)
+        {
+            scenePreloader?.Configure(maxConcurrent, smartPreloading, initialQueue);
+        }
+
+        public void ConfigureValidator(System.Collections.Generic.List<SceneValidationRule> rules = null, bool validation = true, bool autoValidate = true, bool logging = true, bool blockOnCritical = true)
+        {
+            sceneValidator?.Configure(rules, validation, autoValidate, logging, blockOnCritical);
+        }
+
+        public void ConfigureEvents(bool asyncProcessing = true, int maxEvents = 10, bool logging = true)
+        {
+            sceneEvents?.SetEventSettings(asyncProcessing, maxEvents, logging);
         }
     }
 }

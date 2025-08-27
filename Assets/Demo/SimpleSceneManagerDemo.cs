@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using SceneManagement.Runtime;
 using UnityEngine;
@@ -90,11 +89,6 @@ namespace Demo
                 SceneManagerMain.Instance.Events.OnAnyTransitionCompleted.AddListener(OnTransitionCompleted);
             }
 
-            if (SceneManagerMain.Instance?.DataManager != null)
-            {
-                SceneManagerMain.Instance.DataManager.OnSaveCompleted += OnSaveCompleted;
-                SceneManagerMain.Instance.DataManager.OnLoadCompleted += OnLoadCompleted;
-            }
 
             if (SceneManagerMain.Instance?.Preloader != null)
             {
@@ -187,28 +181,6 @@ namespace Demo
 
             GUI.backgroundColor = Color.white;
 
-            GUILayout.Space(15);
-
-            // 存档系统
-            GUILayout.Label("💾 Save/Load System:");
-            GUILayout.Label($"Save Slot ({saveSlots.Length} slots):");
-            selectedSaveIndex = GUILayout.SelectionGrid(selectedSaveIndex, saveSlots, 4);
-            var selectedSave = saveSlots[selectedSaveIndex];
-
-            GUILayout.BeginHorizontal();
-            GUI.backgroundColor = Color.blue;
-            if (GUILayout.Button($"Save: {selectedSave}"))
-            {
-                SaveGame(selectedSave);
-            }
-
-            GUI.backgroundColor = Color.magenta;
-            if (GUILayout.Button($"Load: {selectedSave}"))
-            {
-                LoadGame(selectedSave);
-            }
-
-            GUI.backgroundColor = Color.white;
             GUILayout.EndHorizontal();
 
             GUILayout.Space(15);
@@ -356,32 +328,6 @@ namespace Demo
             }
         }
 
-        private void SaveGame(string saveName)
-        {
-            AddLog($"💾 Saving game to: {saveName}");
-            statusMessage = $"Saving to {saveName}...";
-
-            if (SceneManagerMain.Instance != null)
-            {
-                SceneManagerMain.Instance.SaveGame(saveName);
-            }
-        }
-
-        private void LoadGame(string saveName)
-        {
-            AddLog($"📂 Loading game from: {saveName}");
-            statusMessage = $"Loading from {saveName}...";
-
-            if (SceneManagerMain.Instance != null)
-            {
-                var success = SceneManagerMain.Instance.LoadGame(saveName);
-                if (!success)
-                {
-                    AddLog($"❌ Failed to load save: {saveName}");
-                }
-            }
-        }
-
         private void ValidateScene()
         {
             AddLog("🔍 Validating current scene...");
@@ -429,20 +375,6 @@ namespace Demo
             statusMessage = "Ready";
         }
 
-        private void OnSaveCompleted(string saveName, bool success)
-        {
-            var result = success ? "✅" : "❌";
-            AddLog($"{result} Save {(success ? "completed" : "failed")}: {saveName}");
-            statusMessage = success ? "Save completed" : "Save failed";
-        }
-
-        private void OnLoadCompleted(string saveName, bool success)
-        {
-            var result = success ? "✅" : "❌";
-            AddLog($"{result} Load {(success ? "completed" : "failed")}: {saveName}");
-            statusMessage = success ? "Load completed" : "Load failed";
-        }
-
         private void OnPreloadCompleted(string sceneName)
         {
             AddLog($"⚡ Preload completed: {sceneName}");
@@ -481,11 +413,6 @@ namespace Demo
                 SceneManagerMain.Instance.Events.OnAnyTransitionCompleted.RemoveListener(OnTransitionCompleted);
             }
 
-            if (SceneManagerMain.Instance?.DataManager != null)
-            {
-                SceneManagerMain.Instance.DataManager.OnSaveCompleted -= OnSaveCompleted;
-                SceneManagerMain.Instance.DataManager.OnLoadCompleted -= OnLoadCompleted;
-            }
 
             if (SceneManagerMain.Instance?.Preloader != null)
             {
@@ -504,17 +431,6 @@ namespace Demo
         {
             AddLog("🗑️ Demo destroyed by user");
             Destroy(gameObject);
-        }
-
-        // 编辑器快捷键
-        [Conditional("UNITY_EDITOR")]
-        private void Update()
-        {
-            if (Input.GetKeyDown(KeyCode.F1)) LoadScene(testScenes[0]);
-            if (Input.GetKeyDown(KeyCode.F2)) LoadScene(testScenes[1]);
-            if (Input.GetKeyDown(KeyCode.F3)) TransitionToScene(testScenes[2]);
-            if (Input.GetKeyDown(KeyCode.F5)) SaveGame(saveSlots[0]);
-            if (Input.GetKeyDown(KeyCode.F9)) LoadGame(saveSlots[0]);
         }
     }
 }

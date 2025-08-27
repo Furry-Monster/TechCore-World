@@ -48,8 +48,7 @@ namespace SceneManagement.Runtime
         public string details;
         public DateTime timestamp;
 
-        public ValidationResult(string scene, string rule, bool success, ValidationSeverity sev, string msg,
-            string det = "")
+        public ValidationResult(string scene, string rule, bool success, ValidationSeverity sev, string msg, string det = "")
         {
             sceneName = scene;
             ruleName = rule;
@@ -61,103 +60,94 @@ namespace SceneManagement.Runtime
         }
     }
 
-    public class SceneValidator : MonoBehaviour
+    public interface IValidationRule
     {
-        public static SceneValidator Instance { get; private set; }
+        ValidationResult Validate(Scene scene);
+        string RuleName { get; }
+        bool IsEnabled { get; set; }
+    }
 
-        [Header("Validation Settings")] [SerializeField]
-        private bool validateOnSceneLoad = true;
+    public class SceneValidator
+    {
+        private static SceneValidator instance;
+        public static SceneValidator Instance => instance ??= new SceneValidator();
 
-        [SerializeField] private bool validateOnBuild = true;
-        [SerializeField] private bool logValidationResults = true;
-        [SerializeField] private bool blockLoadOnCriticalErrors = true;
-
-        [Header("Validation Rules")] [SerializeField]
         private List<SceneValidationRule> validationRules = new();
+        private List<IValidationRule> customValidationRules = new();
 
-        private readonly Dictionary<string, List<ValidationResult>> validationHistory = new();
-
-        private readonly HashSet<string> validatedScenes = new();
+        private bool enableValidation = true;
+        private bool autoValidateOnLoad = true;
+        private bool enableLogging = true;
+        private bool blockLoadOnCriticalErrors = true;
 
         public event Action<string, List<ValidationResult>> OnSceneValidated;
-        public event Action<string, ValidationResult> OnValidationFailed;
-        public event Action<string> OnCriticalValidationError;
+        public event Action<string, ValidationResult> OnValidationRuleCompleted;
+        public event Action<string, string> OnValidationBlocked;
 
-        private void Awake()
+        private SceneValidator()
         {
-            if (Instance == null)
-            {
-                Instance = this;
-                DontDestroyOnLoad(gameObject);
-                Initialize();
-            }
-            else
-            {
-                Destroy(gameObject);
-            }
-        }
-
-        private void Initialize()
-        {
-            if (SceneManagerCore.Instance != null)
-            {
-                SceneManagerCore.Instance.OnSceneLoadStarted += OnSceneLoadStartedCallback;
-                SceneManagerCore.Instance.OnSceneLoaded += OnSceneLoadedCallback;
-            }
-
             InitializeDefaultRules();
         }
 
         private void InitializeDefaultRules()
         {
-            if (validationRules.Count == 0)
+            validationRules = new List<SceneValidationRule>
             {
-                validationRules.AddRange(new[]
+                new SceneValidationRule
                 {
-                    new SceneValidationRule
-                    {
-                        ruleName = "MainCamera",
-                        description = "Scene must have a main camera",
-                        validationType = ValidationType.RequiredTag,
-                        expectedValue = "MainCamera",
-                        errorMessage = "No main camera found in scene"
-                    },
-                    new SceneValidationRule
-                    {
-                        ruleName = "Player",
-                        description = "Scene should have a player object",
-                        validationType = ValidationType.RequiredTag,
-                        expectedValue = "Player",
-                        warningMessage = "No player object found in scene"
-                    },
-                    new SceneValidationRule
-                    {
-                        ruleName = "GameManager",
-                        description = "Scene should have a GameManager component",
-                        validationType = ValidationType.RequiredComponent,
-                        expectedValue = "GameManager",
-                        warningMessage = "No GameManager component found in scene"
-                    }
-                });
-            }
+                    ruleName = "Scene Exists",
+                    description = "Verify that the scene file exists",
+                    validationType = ValidationType.SceneExists,
+                    warningMessage = "Scene file may be missing or moved",
+                    errorMessage = "Scene file not found"
+                },
+                new SceneValidationRule
+                {
+                    ruleName = "Minimum GameObjects",
+                    description = "Scene should have at least one GameObject",
+                    validationType = ValidationType.MinimumGameObjects,
+                    expectedValue = "1",
+                    warningMessage = "Scene appears to be empty",
+                    errorMessage = "Scene has no GameObjects"
+                }
+            };
+        }
+
+        public void Initialize(bool validation, bool autoValidate, bool logging, bool blockOnCritical)
+        {
+            enableValidation = validation;
+            autoValidateOnLoad = autoValidate;
+            enableLogging = logging;
+            blockLoadOnCriticalErrors = blockOnCritical;
+        }
+
+        public void SetValidationSettings(bool validation, bool autoValidate, bool logging, bool blockOnCritical)
+        {
+            Initialize(validation, autoValidate, logging, blockOnCritical);
         }
 
         public List<ValidationResult> ValidateScene(string sceneName)
         {
-            var results = new List<ValidationResult>();
-
-            if (string.IsNullOrEmpty(sceneName))
+            if (!enableValidation)
             {
-                results.Add(new ValidationResult(sceneName, "SceneName", false,
-                    ValidationSeverity.Error, "Scene name is null or empty"));
-                return results;
+                return new List<ValidationResult>();
             }
 
-            var scene = SceneManager.GetSceneByName(sceneName);
-            if (!scene.isLoaded)
+            var results = new List<ValidationResult>();
+            var scene = GetSceneByName(sceneName);
+
+            if (!scene.IsValid())
             {
-                results.Add(new ValidationResult(sceneName, "SceneLoaded", false,
-                    ValidationSeverity.Error, "Scene is not loaded"));
+                var result = new ValidationResult(sceneName, "Scene Access", false, ValidationSeverity.Critical,
+                    $"Cannot access scene '{sceneName}' for validation", "Scene may not be loaded or may not exist");
+                results.Add(result);
+
+                if (enableLogging)
+                {
+                    Debug.LogError($"[SceneValidator] {result.message}: {result.details}");
+                }
+
+                OnSceneValidated?.Invoke(sceneName, results);
                 return results;
             }
 
@@ -165,321 +155,205 @@ namespace SceneManagement.Runtime
             {
                 if (!rule.isEnabled) continue;
 
-                var result = ValidateRule(sceneName, scene, rule);
-                results.Add(result);
-
-                if (!result.passed)
+                try
                 {
-                    OnValidationFailed?.Invoke(sceneName, result);
+                    var result = ValidateRule(scene, rule);
+                    results.Add(result);
 
-                    if (result.severity == ValidationSeverity.Critical)
+                    OnValidationRuleCompleted?.Invoke(sceneName, result);
+
+                    if (enableLogging && !result.passed)
                     {
-                        OnCriticalValidationError?.Invoke(sceneName);
+                        var logMethod = result.severity == ValidationSeverity.Critical ? 
+                            (System.Action<string>)Debug.LogError :
+                            result.severity == ValidationSeverity.Error ? Debug.LogError :
+                            result.severity == ValidationSeverity.Warning ? Debug.LogWarning : Debug.Log;
+
+                        logMethod($"[SceneValidator] {result.message}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    var errorResult = new ValidationResult(sceneName, rule.ruleName, false, ValidationSeverity.Error,
+                        $"Validation rule '{rule.ruleName}' failed with exception", ex.Message);
+                    results.Add(errorResult);
+
+                    if (enableLogging)
+                    {
+                        Debug.LogError($"[SceneValidator] Exception in rule '{rule.ruleName}': {ex.Message}");
                     }
                 }
             }
 
-            validationHistory[sceneName] = results;
-            validatedScenes.Add(sceneName);
-
-            if (logValidationResults)
+            foreach (var customRule in customValidationRules)
             {
-                LogValidationResults(sceneName, results);
+                if (!customRule.IsEnabled) continue;
+
+                try
+                {
+                    var result = customRule.Validate(scene);
+                    results.Add(result);
+                    OnValidationRuleCompleted?.Invoke(sceneName, result);
+                }
+                catch (Exception ex)
+                {
+                    var errorResult = new ValidationResult(sceneName, customRule.RuleName, false, ValidationSeverity.Error,
+                        $"Custom validation rule '{customRule.RuleName}' failed", ex.Message);
+                    results.Add(errorResult);
+
+                    if (enableLogging)
+                    {
+                        Debug.LogError($"[SceneValidator] Exception in custom rule '{customRule.RuleName}': {ex.Message}");
+                    }
+                }
+            }
+
+            var hasCriticalErrors = results.Exists(r => r.severity == ValidationSeverity.Critical && !r.passed);
+            if (hasCriticalErrors && blockLoadOnCriticalErrors)
+            {
+                var criticalError = results.Find(r => r.severity == ValidationSeverity.Critical && !r.passed);
+                OnValidationBlocked?.Invoke(sceneName, criticalError.message);
+
+                if (enableLogging)
+                {
+                    Debug.LogError($"[SceneValidator] Scene loading blocked due to critical validation failure: {criticalError.message}");
+                }
             }
 
             OnSceneValidated?.Invoke(sceneName, results);
+
+            if (enableLogging)
+            {
+                var passedCount = results.FindAll(r => r.passed).Count;
+                var totalCount = results.Count;
+                Debug.Log($"[SceneValidator] Scene '{sceneName}' validation completed: {passedCount}/{totalCount} rules passed");
+            }
+
             return results;
         }
 
-        private ValidationResult ValidateRule(string sceneName, Scene scene, SceneValidationRule rule)
+        private ValidationResult ValidateRule(Scene scene, SceneValidationRule rule)
         {
-            try
+            switch (rule.validationType)
             {
-                return rule.validationType switch
-                {
-                    ValidationType.SceneExists => ValidateSceneExists(sceneName, rule),
-                    ValidationType.RequiredTag => ValidateRequiredTag(sceneName, scene, rule),
-                    ValidationType.RequiredComponent => ValidateRequiredComponent(sceneName, scene, rule),
-                    ValidationType.RequiredLayer => ValidateRequiredLayer(sceneName, scene, rule),
-                    ValidationType.MinimumGameObjects => ValidateMinimumGameObjects(sceneName, scene, rule),
-                    ValidationType.MaximumGameObjects => ValidateMaximumGameObjects(sceneName, scene, rule),
-                    ValidationType.CustomValidation => ValidateCustomRule(sceneName, scene, rule),
-                    _ => new ValidationResult(sceneName, rule.ruleName, false, ValidationSeverity.Error,
-                        $"Unknown validation type: {rule.validationType}")
-                };
-            }
-            catch (Exception ex)
-            {
-                return new ValidationResult(sceneName, rule.ruleName, false,
-                    ValidationSeverity.Error, $"Validation error: {ex.Message}", ex.StackTrace);
+                case ValidationType.SceneExists:
+                    return ValidateSceneExists(scene, rule);
+
+                case ValidationType.RequiredComponent:
+                    return ValidateRequiredComponent(scene, rule);
+
+                case ValidationType.RequiredTag:
+                    return ValidateRequiredTag(scene, rule);
+
+                case ValidationType.MinimumGameObjects:
+                    return ValidateMinimumGameObjects(scene, rule);
+
+                case ValidationType.MaximumGameObjects:
+                    return ValidateMaximumGameObjects(scene, rule);
+
+                case ValidationType.RequiredLayer:
+                    return ValidateRequiredLayer(scene, rule);
+
+                default:
+                    return new ValidationResult(scene.name, rule.ruleName, false, ValidationSeverity.Warning,
+                        $"Unknown validation type: {rule.validationType}");
             }
         }
 
-        private ValidationResult ValidateSceneExists(string sceneName, SceneValidationRule rule)
+        private ValidationResult ValidateSceneExists(Scene scene, SceneValidationRule rule)
         {
-            for (var i = 0; i < SceneManager.sceneCountInBuildSettings; i++)
-            {
-                var scenePath = SceneUtility.GetScenePathByBuildIndex(i);
-                var nameWithoutExtension = Path.GetFileNameWithoutExtension(scenePath);
+            var scenePath = scene.path;
+            var exists = !string.IsNullOrEmpty(scenePath) && File.Exists(scenePath);
 
-                if (nameWithoutExtension == sceneName)
-                {
-                    return new ValidationResult(sceneName, rule.ruleName, true,
-                        ValidationSeverity.Info, "Scene exists in build settings");
-                }
-            }
-
-            return new ValidationResult(sceneName, rule.ruleName, false,
-                ValidationSeverity.Error, rule.errorMessage ?? "Scene not found in build settings");
+            return new ValidationResult(scene.name, rule.ruleName, exists,
+                exists ? ValidationSeverity.Info : ValidationSeverity.Critical,
+                exists ? "Scene file exists" : rule.errorMessage,
+                exists ? $"Scene path: {scenePath}" : $"Expected scene file not found");
         }
 
-        private ValidationResult ValidateRequiredTag(string sceneName, Scene scene, SceneValidationRule rule)
+        private ValidationResult ValidateRequiredComponent(Scene scene, SceneValidationRule rule)
         {
             var rootObjects = scene.GetRootGameObjects();
+            var componentType = Type.GetType(rule.expectedValue);
 
-            foreach (var root in rootObjects)
+            if (componentType == null)
             {
-                if (FindGameObjectWithTag(root, rule.expectedValue) != null)
+                return new ValidationResult(scene.name, rule.ruleName, false, ValidationSeverity.Error,
+                    $"Component type '{rule.expectedValue}' not found", "Check component name and namespace");
+            }
+
+            var found = false;
+            foreach (var rootObj in rootObjects)
+            {
+                if (rootObj.GetComponentInChildren(componentType) != null)
                 {
-                    return new ValidationResult(sceneName, rule.ruleName, true,
-                        ValidationSeverity.Info, $"Found object with tag: {rule.expectedValue}");
+                    found = true;
+                    break;
                 }
             }
 
-            var severity = !string.IsNullOrEmpty(rule.errorMessage)
-                ? ValidationSeverity.Error
-                : ValidationSeverity.Warning;
-            var message = !string.IsNullOrEmpty(rule.errorMessage)
-                ? rule.errorMessage
-                : rule.warningMessage ?? $"No object with tag '{rule.expectedValue}' found";
-
-            return new ValidationResult(sceneName, rule.ruleName, false, severity, message);
+            return new ValidationResult(scene.name, rule.ruleName, found,
+                found ? ValidationSeverity.Info : ValidationSeverity.Warning,
+                found ? $"Required component '{rule.expectedValue}' found" : rule.warningMessage);
         }
 
-        private ValidationResult ValidateRequiredComponent(string sceneName, Scene scene, SceneValidationRule rule)
+        private ValidationResult ValidateRequiredTag(Scene scene, SceneValidationRule rule)
         {
-            var rootObjects = scene.GetRootGameObjects();
+            var found = GameObject.FindGameObjectWithTag(rule.expectedValue) != null;
 
-            foreach (var root in rootObjects)
+            return new ValidationResult(scene.name, rule.ruleName, found,
+                found ? ValidationSeverity.Info : ValidationSeverity.Warning,
+                found ? $"Required tag '{rule.expectedValue}' found" : rule.warningMessage);
+        }
+
+        private ValidationResult ValidateMinimumGameObjects(Scene scene, SceneValidationRule rule)
+        {
+            var count = scene.rootCount;
+            var minimum = int.TryParse(rule.expectedValue, out var min) ? min : 1;
+            var passed = count >= minimum;
+
+            return new ValidationResult(scene.name, rule.ruleName, passed,
+                passed ? ValidationSeverity.Info : ValidationSeverity.Warning,
+                passed ? $"Scene has {count} root GameObjects (minimum: {minimum})" : rule.warningMessage,
+                $"Current count: {count}, Required minimum: {minimum}");
+        }
+
+        private ValidationResult ValidateMaximumGameObjects(Scene scene, SceneValidationRule rule)
+        {
+            var count = scene.rootCount;
+            var maximum = int.TryParse(rule.expectedValue, out var max) ? max : 100;
+            var passed = count <= maximum;
+
+            return new ValidationResult(scene.name, rule.ruleName, passed,
+                passed ? ValidationSeverity.Info : ValidationSeverity.Warning,
+                passed ? $"Scene has {count} root GameObjects (maximum: {maximum})" : rule.warningMessage,
+                $"Current count: {count}, Allowed maximum: {maximum}");
+        }
+
+        private ValidationResult ValidateRequiredLayer(Scene scene, SceneValidationRule rule)
+        {
+            var layerName = rule.expectedValue;
+            var layerIndex = LayerMask.NameToLayer(layerName);
+            var layerExists = layerIndex != -1;
+
+            return new ValidationResult(scene.name, rule.ruleName, layerExists,
+                layerExists ? ValidationSeverity.Info : ValidationSeverity.Warning,
+                layerExists ? $"Required layer '{layerName}' exists" : rule.warningMessage,
+                layerExists ? $"Layer index: {layerIndex}" : $"Layer '{layerName}' not found in project settings");
+        }
+
+        private Scene GetSceneByName(string sceneName)
+        {
+            for (int i = 0; i < SceneManager.sceneCount; i++)
             {
-                if (FindComponentInChildren(root, rule.expectedValue) != null)
+                var scene = SceneManager.GetSceneAt(i);
+                if (scene.name == sceneName)
                 {
-                    return new ValidationResult(sceneName, rule.ruleName, true,
-                        ValidationSeverity.Info, $"Found component: {rule.expectedValue}");
+                    return scene;
                 }
             }
 
-            var severity = !string.IsNullOrEmpty(rule.errorMessage)
-                ? ValidationSeverity.Error
-                : ValidationSeverity.Warning;
-            var message = !string.IsNullOrEmpty(rule.errorMessage)
-                ? rule.errorMessage
-                : rule.warningMessage ?? $"No component '{rule.expectedValue}' found";
-
-            return new ValidationResult(sceneName, rule.ruleName, false, severity, message);
-        }
-
-        private ValidationResult ValidateRequiredLayer(string sceneName, Scene scene, SceneValidationRule rule)
-        {
-            var layerIndex = LayerMask.NameToLayer(rule.expectedValue);
-            if (layerIndex == -1)
-            {
-                return new ValidationResult(sceneName, rule.ruleName, false,
-                    ValidationSeverity.Error, $"Layer '{rule.expectedValue}' does not exist");
-            }
-
-            var rootObjects = scene.GetRootGameObjects();
-
-            foreach (var root in rootObjects)
-            {
-                if (FindGameObjectOnLayer(root, layerIndex) != null)
-                {
-                    return new ValidationResult(sceneName, rule.ruleName, true,
-                        ValidationSeverity.Info, $"Found object on layer: {rule.expectedValue}");
-                }
-            }
-
-            var severity = !string.IsNullOrEmpty(rule.errorMessage)
-                ? ValidationSeverity.Error
-                : ValidationSeverity.Warning;
-            var message = !string.IsNullOrEmpty(rule.errorMessage)
-                ? rule.errorMessage
-                : rule.warningMessage ?? $"No object on layer '{rule.expectedValue}' found";
-
-            return new ValidationResult(sceneName, rule.ruleName, false, severity, message);
-        }
-
-        private ValidationResult ValidateMinimumGameObjects(string sceneName, Scene scene, SceneValidationRule rule)
-        {
-            if (!int.TryParse(rule.expectedValue, out var minCount))
-            {
-                return new ValidationResult(sceneName, rule.ruleName, false,
-                    ValidationSeverity.Error, "Invalid minimum count value");
-            }
-
-            var allObjects = scene.GetRootGameObjects();
-            var totalCount = 0;
-
-            foreach (var root in allObjects)
-            {
-                totalCount += CountAllChildren(root);
-            }
-
-            var passed = totalCount >= minCount;
-            var severity = passed ? ValidationSeverity.Info : ValidationSeverity.Warning;
-            var message = passed
-                ? $"Scene has {totalCount} objects (minimum: {minCount})"
-                : $"Scene has only {totalCount} objects, minimum required: {minCount}";
-
-            return new ValidationResult(sceneName, rule.ruleName, passed, severity, message);
-        }
-
-        private ValidationResult ValidateMaximumGameObjects(string sceneName, Scene scene, SceneValidationRule rule)
-        {
-            if (!int.TryParse(rule.expectedValue, out var maxCount))
-            {
-                return new ValidationResult(sceneName, rule.ruleName, false,
-                    ValidationSeverity.Error, "Invalid maximum count value");
-            }
-
-            var allObjects = scene.GetRootGameObjects();
-            var totalCount = 0;
-
-            foreach (var root in allObjects)
-            {
-                totalCount += CountAllChildren(root);
-            }
-
-            var passed = totalCount <= maxCount;
-            var severity = passed ? ValidationSeverity.Info : ValidationSeverity.Warning;
-            var message = passed
-                ? $"Scene has {totalCount} objects (maximum: {maxCount})"
-                : $"Scene has {totalCount} objects, maximum allowed: {maxCount}";
-
-            return new ValidationResult(sceneName, rule.ruleName, passed, severity, message);
-        }
-
-        private ValidationResult ValidateCustomRule(string sceneName, Scene scene, SceneValidationRule rule)
-        {
-            return new ValidationResult(sceneName, rule.ruleName, true,
-                ValidationSeverity.Info, "Custom validation not implemented");
-        }
-
-        private GameObject FindGameObjectWithTag(GameObject parent, string tag)
-        {
-            if (parent.CompareTag(tag))
-                return parent;
-
-            for (var i = 0; i < parent.transform.childCount; i++)
-            {
-                var result = FindGameObjectWithTag(parent.transform.GetChild(i).gameObject, tag);
-                if (result != null)
-                    return result;
-            }
-
-            return null;
-        }
-
-        private Component FindComponentInChildren(GameObject parent, string componentName)
-        {
-            var component = parent.GetComponent(componentName);
-            if (component != null)
-                return component;
-
-            for (var i = 0; i < parent.transform.childCount; i++)
-            {
-                var result = FindComponentInChildren(parent.transform.GetChild(i).gameObject, componentName);
-                if (result != null)
-                    return result;
-            }
-
-            return null;
-        }
-
-        private GameObject FindGameObjectOnLayer(GameObject parent, int layer)
-        {
-            if (parent.layer == layer)
-                return parent;
-
-            for (var i = 0; i < parent.transform.childCount; i++)
-            {
-                var result = FindGameObjectOnLayer(parent.transform.GetChild(i).gameObject, layer);
-                if (result != null)
-                    return result;
-            }
-
-            return null;
-        }
-
-        private int CountAllChildren(GameObject parent)
-        {
-            var count = 1; // Count the parent itself
-
-            for (var i = 0; i < parent.transform.childCount; i++)
-            {
-                count += CountAllChildren(parent.transform.GetChild(i).gameObject);
-            }
-
-            return count;
-        }
-
-        private void LogValidationResults(string sceneName, List<ValidationResult> results)
-        {
-            var passedCount = 0;
-            var warningCount = 0;
-            var errorCount = 0;
-
-            foreach (var result in results)
-            {
-                if (result.passed)
-                {
-                    passedCount++;
-                }
-                else
-                {
-                    switch (result.severity)
-                    {
-                        case ValidationSeverity.Warning:
-                            warningCount++;
-                            Debug.LogWarning($"[SceneValidator] {sceneName}: {result.message}");
-                            break;
-                        case ValidationSeverity.Error:
-                        case ValidationSeverity.Critical:
-                            errorCount++;
-                            Debug.LogError($"[SceneValidator] {sceneName}: {result.message}");
-                            break;
-                    }
-                }
-            }
-
-            Debug.Log(
-                $"[SceneValidator] {sceneName} validation complete: {passedCount} passed, {warningCount} warnings, {errorCount} errors");
-        }
-
-        public bool HasCriticalErrors(string sceneName)
-        {
-            if (!validationHistory.TryGetValue(sceneName, out var results))
-                return false;
-
-            foreach (var result in results)
-            {
-                if (!result.passed && result.severity == ValidationSeverity.Critical)
-                    return true;
-            }
-
-            return false;
-        }
-
-        public bool IsSceneValidated(string sceneName)
-        {
-            return validatedScenes.Contains(sceneName);
-        }
-
-        public List<ValidationResult> GetValidationHistory(string sceneName)
-        {
-            return validationHistory.TryGetValue(sceneName, out var result)
-                ? new List<ValidationResult>(result)
-                : new List<ValidationResult>();
+            return default(Scene);
         }
 
         public void AddValidationRule(SceneValidationRule rule)
@@ -490,46 +364,61 @@ namespace SceneManagement.Runtime
             }
         }
 
+        public void AddCustomValidationRule(IValidationRule customRule)
+        {
+            if (customRule != null)
+            {
+                customValidationRules.Add(customRule);
+            }
+        }
+
         public void RemoveValidationRule(string ruleName)
         {
             validationRules.RemoveAll(r => r.ruleName == ruleName);
+            customValidationRules.RemoveAll(r => r.RuleName == ruleName);
         }
 
-        public void EnableRule(string ruleName, bool ruleEnabled)
+        public void EnableValidationRule(string ruleName, bool enabled)
         {
             var rule = validationRules.Find(r => r.ruleName == ruleName);
             if (rule != null)
             {
-                rule.isEnabled = ruleEnabled;
+                rule.isEnabled = enabled;
             }
-        }
 
-        private void OnSceneLoadStartedCallback(string sceneName)
-        {
-            if (validateOnSceneLoad && blockLoadOnCriticalErrors)
+            var customRule = customValidationRules.Find(r => r.RuleName == ruleName);
+            if (customRule != null)
             {
-                if (IsSceneValidated(sceneName) && HasCriticalErrors(sceneName))
-                {
-                    Debug.LogError(
-                        $"[SceneValidator] Blocking scene load due to critical validation errors: {sceneName}");
-                }
+                customRule.IsEnabled = enabled;
             }
         }
 
-        private void OnSceneLoadedCallback(string sceneName, Scene scene)
+        public void ClearValidationRules()
         {
-            if (validateOnSceneLoad)
+            validationRules.Clear();
+            customValidationRules.Clear();
+            InitializeDefaultRules();
+        }
+
+        public List<SceneValidationRule> GetValidationRules()
+        {
+            return new List<SceneValidationRule>(validationRules);
+        }
+
+        public bool ShouldBlockSceneLoad(List<ValidationResult> results)
+        {
+            if (!blockLoadOnCriticalErrors) return false;
+            return results.Exists(r => r.severity == ValidationSeverity.Critical && !r.passed);
+        }
+
+        public void Configure(List<SceneValidationRule> rules = null, bool validation = true, bool autoValidate = true, bool logging = true, bool blockOnCritical = true)
+        {
+            if (rules != null)
             {
-                ValidateScene(sceneName);
+                validationRules = new List<SceneValidationRule>(rules);
             }
-        }
 
-        public void SetValidationSettings(bool onLoad, bool onBuild, bool logResults, bool blockCritical)
-        {
-            validateOnSceneLoad = onLoad;
-            validateOnBuild = onBuild;
-            logValidationResults = logResults;
-            blockLoadOnCriticalErrors = blockCritical;
+            Initialize(validation, autoValidate, logging, blockOnCritical);
         }
     }
 }

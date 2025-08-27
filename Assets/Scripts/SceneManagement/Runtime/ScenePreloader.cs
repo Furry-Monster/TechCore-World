@@ -1,8 +1,7 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
-using UnityEngine.SceneManagement;
 
 namespace SceneManagement.Runtime
 {
@@ -15,16 +14,14 @@ namespace SceneManagement.Runtime
         public int priority;
     }
 
-    public class ScenePreloader : MonoBehaviour
+    public class ScenePreloader
     {
-        public static ScenePreloader Instance { get; private set; }
+        private static ScenePreloader instance;
+        public static ScenePreloader Instance => instance ??= new ScenePreloader();
 
-        [Header("Preload Configuration")] [SerializeField]
         private List<PreloadSettings> preloadQueue = new();
-
-        [SerializeField] private int maxConcurrentPreloads = 3;
-        [SerializeField] private bool preloadOnStart = true;
-        [SerializeField] private bool enableSmartPreloading = true;
+        private int maxConcurrentPreloads = 3;
+        private bool enableSmartPreloading = true;
 
         private readonly Queue<PreloadSettings> pendingPreloads = new();
         private readonly HashSet<string> currentlyPreloading = new();
@@ -36,42 +33,23 @@ namespace SceneManagement.Runtime
         public event Action<string, float> OnPreloadProgress;
         public event Action<string, string> OnPreloadFailed;
 
-        private void Awake()
-        {
-            if (Instance == null)
-            {
-                Instance = this;
-                DontDestroyOnLoad(gameObject);
-                Initialize();
-            }
-            else
-            {
-                Destroy(gameObject);
-            }
-        }
-
-        private void Start()
-        {
-            if (preloadOnStart)
-            {
-                StartPreloadQueue();
-            }
-        }
-
-        private void Initialize()
+        private ScenePreloader()
         {
             LoadUsageData();
+        }
 
-            if (SceneManagerCore.Instance != null)
+        public void Initialize(SceneManagerCore coreManager)
+        {
+            if (coreManager != null)
             {
-                SceneManagerCore.Instance.OnSceneLoaded += OnSceneLoadedCallback;
-                SceneManagerCore.Instance.OnSceneLoadStarted += OnSceneAccessedCallback;
+                coreManager.OnSceneLoaded += OnSceneLoadedCallback;
+                coreManager.OnSceneLoadStarted += OnSceneAccessedCallback;
             }
 
             SortPreloadQueueByPriority();
         }
 
-        private void OnDestroy()
+        public void Shutdown()
         {
             SaveUsageData();
         }
@@ -110,7 +88,11 @@ namespace SceneManagement.Runtime
                 }
             }
 
-            StartCoroutine(ProcessPreloadQueue());
+            // 委托给SceneManagerCore来处理协程
+            if (SceneManagerCore.Instance != null)
+            {
+                SceneManagerCore.Instance.StartCoroutine(ProcessPreloadQueueCoroutine());
+            }
         }
 
         public void PreloadScene(string sceneName, int priority = 0)
@@ -123,31 +105,35 @@ namespace SceneManagement.Runtime
                  SceneManagerCore.Instance.IsScenePreloaded(sceneName)))
                 return;
 
-            StartCoroutine(PreloadSceneCoroutine(sceneName, priority));
+            // 委托给SceneManagerCore来处理协程
+            if (SceneManagerCore.Instance != null)
+            {
+                SceneManagerCore.Instance.StartCoroutine(PreloadSceneCoroutine(sceneName, priority));
+            }
         }
 
-        private IEnumerator ProcessPreloadQueue()
+        private System.Collections.IEnumerator ProcessPreloadQueueCoroutine()
         {
             while (pendingPreloads.Count > 0)
             {
                 while (currentlyPreloading.Count >= maxConcurrentPreloads)
                 {
-                    yield return new WaitForSeconds(0.1f);
+                    yield return new UnityEngine.WaitForSeconds(0.1f);
                 }
 
                 var settings = pendingPreloads.Dequeue();
 
                 if (settings.preloadDelay > 0)
                 {
-                    yield return new WaitForSeconds(settings.preloadDelay);
+                    yield return new UnityEngine.WaitForSeconds(settings.preloadDelay);
                 }
 
                 PreloadScene(settings.sceneName, settings.priority);
-                yield return new WaitForSeconds(0.1f);
+                yield return new UnityEngine.WaitForSeconds(0.1f);
             }
         }
 
-        private IEnumerator PreloadSceneCoroutine(string sceneName, int priority)
+        private System.Collections.IEnumerator PreloadSceneCoroutine(string sceneName, int priority)
         {
             currentlyPreloading.Add(sceneName);
             OnPreloadStarted?.Invoke(sceneName);
@@ -165,7 +151,7 @@ namespace SceneManagement.Runtime
                     yield break;
                 }
 
-                var timeout = 30f + (priority * 5f); // 优先级影响超时时间
+                var timeout = 30f + (priority * 5f);
                 var elapsed = 0f;
 
                 while (!SceneManagerCore.Instance.IsScenePreloaded(sceneName) && elapsed < timeout)
@@ -263,7 +249,7 @@ namespace SceneManagement.Runtime
             lastAccessTime[sceneName] = DateTime.Now;
         }
 
-        private void OnSceneLoadedCallback(string sceneName, Scene scene)
+        private void OnSceneLoadedCallback(string sceneName, UnityEngine.SceneManagement.Scene scene)
         {
             UpdateSceneUsage(sceneName);
 
@@ -289,7 +275,7 @@ namespace SceneManagement.Runtime
             try
             {
                 var data = JsonUtility.FromJson<SceneUsageData>(json);
-                if (data is { usageFrequency: not null })
+                if (data?.usageFrequency != null)
                 {
                     sceneUsageFrequency = data.usageFrequency;
                 }
@@ -342,6 +328,19 @@ namespace SceneManagement.Runtime
         public Dictionary<string, float> GetSceneUsageStats()
         {
             return new Dictionary<string, float>(sceneUsageFrequency);
+        }
+
+        // 配置方法
+        public void Configure(int maxConcurrent, bool smartPreloading, List<PreloadSettings> initialQueue = null)
+        {
+            maxConcurrentPreloads = maxConcurrent;
+            enableSmartPreloading = smartPreloading;
+            
+            if (initialQueue != null)
+            {
+                preloadQueue = new List<PreloadSettings>(initialQueue);
+                SortPreloadQueueByPriority();
+            }
         }
     }
 
