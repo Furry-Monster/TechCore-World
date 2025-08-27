@@ -817,7 +817,7 @@ Canvas:
   m_OverrideSorting: 0
   m_OverridePixelPerfect: 0
   m_SortingBucketNormalizedSize: 0
-  m_VertexColorAlwaysGammaSpace: 0
+  m_VertexColorAlwaysGammaSpace: 1
   m_AdditionalShaderChannelsFlag: 0
   m_UpdateRectTransformForStandalone: 0
   m_SortingLayerID: 0
@@ -888,7 +888,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &1746948808
 RectTransform:
   m_ObjectHideFlags: 0
@@ -905,8 +905,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0, y: 38.9749}
-  m_SizeDelta: {x: 665, y: 296.0501}
+  m_AnchoredPosition: {x: -0.000061035, y: -0.000015259}
+  m_SizeDelta: {x: 1920, y: 1080}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1746948809
 MonoBehaviour:
@@ -1034,23 +1034,10 @@ MonoBehaviour:
   m_GameObject: {fileID: 1989681848}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d351dfcffbd9612ccbe7b0a958a2dafa, type: 3}
+  m_Script: {fileID: 11500000, guid: 6c4ee44481a4b5ff8aa5ac73f498d0ce, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  loadSceneButton: {fileID: 0}
-  unloadSceneButton: {fileID: 0}
-  preloadSceneButton: {fileID: 0}
-  transitionButton: {fileID: 0}
-  saveGameButton: {fileID: 0}
-  loadGameButton: {fileID: 0}
-  validateSceneButton: {fileID: 0}
-  sceneDropdown: {fileID: 0}
-  saveSlotDropdown: {fileID: 0}
-  progressSlider: {fileID: 0}
-  statusText: {fileID: 0}
-  logText: {fileID: 0}
-  logScrollRect: {fileID: 0}
-  demoScenes:
+  testScenes:
   - MainMenu
   - GameLevel1
   - GameLevel2
@@ -1060,7 +1047,7 @@ MonoBehaviour:
   - Save2
   - Save3
   - AutoSave
-  enableDetailedLogging: 1
+  showDebugInfo: 1
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

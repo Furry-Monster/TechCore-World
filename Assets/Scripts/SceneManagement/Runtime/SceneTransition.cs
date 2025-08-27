@@ -98,7 +98,7 @@ namespace SceneManagement.Runtime
                 textObj.transform.SetParent(loadingObj.transform, false);
                 loadingText = textObj.AddComponent<Text>();
                 loadingText.text = loadingMessages[0];
-                loadingText.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+                loadingText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
                 loadingText.fontSize = 36;
                 loadingText.alignment = TextAnchor.MiddleCenter;
                 loadingText.color = Color.white;
