@@ -46,9 +46,9 @@ namespace SceneManagement.Runtime
             SceneManager.sceneLoaded += OnSceneLoadedCallback;
             SceneManager.sceneUnloaded += OnSceneUnloadedCallback;
 
-            for (int i = 0; i < SceneManager.sceneCount; i++)
+            for (var i = 0; i < SceneManager.sceneCount; i++)
             {
-                Scene scene = SceneManager.GetSceneAt(i);
+                var scene = SceneManager.GetSceneAt(i);
                 if (scene.isLoaded)
                 {
                     loadedScenes[scene.name] = scene;

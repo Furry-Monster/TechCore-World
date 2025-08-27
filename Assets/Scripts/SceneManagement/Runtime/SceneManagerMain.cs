@@ -1,8 +1,9 @@
+using System;
 using UnityEngine;
 
 namespace SceneManagement.Runtime
 {
-    [System.Serializable]
+    [Serializable]
     public class SceneManagerSettings
     {
         [Header("Core Settings")] public bool autoInitialize = true;
@@ -316,7 +317,7 @@ namespace SceneManagement.Runtime
             }
         }
 
-        [System.Serializable]
+        [Serializable]
         public class SceneManagerInfo
         {
             public string version = "1.0.0";
