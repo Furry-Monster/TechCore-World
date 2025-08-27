@@ -166,7 +166,7 @@ namespace SceneManagement.Runtime
             scenesInTransition.Add(sceneName);
             OnSceneUnloadStarted?.Invoke(sceneName);
 
-            AsyncOperation asyncOperation = SceneManager.UnloadSceneAsync(sceneName);
+            var asyncOperation = SceneManager.UnloadSceneAsync(sceneName);
 
             if (asyncOperation == null)
             {
@@ -188,7 +188,7 @@ namespace SceneManagement.Runtime
                 return;
             }
 
-            AsyncOperation asyncOperation = SceneManager.LoadSceneAsync(sceneName, LoadSceneMode.Additive);
+            var asyncOperation = SceneManager.LoadSceneAsync(sceneName, LoadSceneMode.Additive);
             if (asyncOperation != null)
             {
                 asyncOperation.allowSceneActivation = false;
@@ -222,13 +222,13 @@ namespace SceneManagement.Runtime
 
         public Scene GetLoadedScene(string sceneName)
         {
-            loadedScenes.TryGetValue(sceneName, out Scene scene);
+            loadedScenes.TryGetValue(sceneName, out var scene);
             return scene;
         }
 
         public string[] GetLoadedSceneNames()
         {
-            string[] sceneNames = new string[loadedScenes.Count];
+            var sceneNames = new string[loadedScenes.Count];
             loadedScenes.Keys.CopyTo(sceneNames, 0);
             return sceneNames;
         }

@@ -1,21 +1,25 @@
+using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using SceneManagement.Runtime;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace Demo
 {
     public class SimpleSceneManagerDemo : MonoBehaviour
     {
-        public static SimpleSceneManagerDemo Instance { get; private set; }
+        private static SimpleSceneManagerDemo Instance { get; set; }
 
-        [Header("Demo Settings")]
-        [SerializeField] private string[] testScenes = { "MainMenu", "GameLevel1", "GameLevel2", "Settings" };
+        [Header("Demo Settings")] [SerializeField]
+        private string[] testScenes = { "MainMenu", "GameLevel1", "GameLevel2", "Settings" };
+
         [SerializeField] private string[] saveSlots = { "Save1", "Save2", "Save3", "AutoSave" };
         [SerializeField] private bool showDebugInfo = true;
 
-        private int selectedSceneIndex = 0;
-        private int selectedSaveIndex = 0;
+        private int selectedSceneIndex;
+        private int selectedSaveIndex;
         private Vector2 scrollPosition;
         private readonly List<string> logMessages = new();
         private bool showLogs = true;
@@ -35,7 +39,6 @@ namespace Demo
             {
                 // 如果已经存在实例，销毁当前对象
                 Destroy(gameObject);
-                return;
             }
         }
 
@@ -43,7 +46,7 @@ namespace Demo
         {
             // 只有主实例才执行初始化
             if (Instance != this) return;
-            
+
             // 确保场景管理器已初始化
             EnsureSceneManagerExists();
             SubscribeToEvents();
@@ -56,7 +59,7 @@ namespace Demo
             {
                 var managerObject = new GameObject("SceneManager");
                 var sceneManager = managerObject.AddComponent<SceneManagerMain>();
-                
+
                 // 配置基本设置
                 var settings = new SceneManagerSettings
                 {
@@ -67,10 +70,10 @@ namespace Demo
                     enablePreloading = true,
                     validateScenesOnLoad = true
                 };
-                
+
                 sceneManager.SetSettings(settings);
                 sceneManager.InitializeSceneManager();
-                
+
                 AddLog("SceneManager automatically created and initialized");
             }
         }
@@ -111,7 +114,7 @@ namespace Demo
             if (!showDemo) return;
 
             GUILayout.BeginArea(new Rect(10, 50, Screen.width - 20, Screen.height - 70));
-            
+
             // 标题栏显示持久化状态
             GUILayout.BeginHorizontal(GUI.skin.box, GUILayout.Height(35));
             GUILayout.Label("🎮 Unity Scene Manager Demo", GUILayout.ExpandWidth(true));
@@ -121,24 +124,25 @@ namespace Demo
                 DestroyDemo();
                 return;
             }
+
             GUILayout.EndHorizontal();
-            
+
             GUILayout.BeginHorizontal();
-            
+
             // 左侧控制面板
             GUILayout.BeginVertical(GUI.skin.box, GUILayout.Width(300));
             DrawControlPanel();
             GUILayout.EndVertical();
-            
+
             GUILayout.Space(10);
-            
+
             // 右侧信息面板
             GUILayout.BeginVertical(GUI.skin.box);
             DrawInfoPanel();
             GUILayout.EndVertical();
-            
+
             GUILayout.EndHorizontal();
-            
+
             GUILayout.EndArea();
         }
 
@@ -150,31 +154,31 @@ namespace Demo
             // 场景选择
             GUILayout.Label($"Select Scene ({testScenes.Length} available):");
             selectedSceneIndex = GUILayout.SelectionGrid(selectedSceneIndex, testScenes, 2);
-            string selectedScene = testScenes[selectedSceneIndex];
-            
+            var selectedScene = testScenes[selectedSceneIndex];
+
             GUILayout.Space(10);
 
             // 场景操作按钮
             GUILayout.Label("🎬 Scene Operations:");
-            
+
             GUI.backgroundColor = Color.green;
             if (GUILayout.Button($"Load Scene: {selectedScene}", GUILayout.Height(30)))
             {
                 LoadScene(selectedScene);
             }
-            
+
             GUI.backgroundColor = Color.cyan;
             if (GUILayout.Button($"Transition to: {selectedScene}", GUILayout.Height(30)))
             {
                 TransitionToScene(selectedScene);
             }
-            
+
             GUI.backgroundColor = Color.yellow;
             if (GUILayout.Button($"Preload: {selectedScene}", GUILayout.Height(30)))
             {
                 PreloadScene(selectedScene);
             }
-            
+
             GUI.backgroundColor = Color.red;
             if (GUILayout.Button($"Unload: {selectedScene}", GUILayout.Height(30)))
             {
@@ -182,47 +186,48 @@ namespace Demo
             }
 
             GUI.backgroundColor = Color.white;
-            
+
             GUILayout.Space(15);
 
             // 存档系统
             GUILayout.Label("💾 Save/Load System:");
             GUILayout.Label($"Save Slot ({saveSlots.Length} slots):");
             selectedSaveIndex = GUILayout.SelectionGrid(selectedSaveIndex, saveSlots, 4);
-            string selectedSave = saveSlots[selectedSaveIndex];
-            
+            var selectedSave = saveSlots[selectedSaveIndex];
+
             GUILayout.BeginHorizontal();
             GUI.backgroundColor = Color.blue;
             if (GUILayout.Button($"Save: {selectedSave}"))
             {
                 SaveGame(selectedSave);
             }
-            
+
             GUI.backgroundColor = Color.magenta;
             if (GUILayout.Button($"Load: {selectedSave}"))
             {
                 LoadGame(selectedSave);
             }
+
             GUI.backgroundColor = Color.white;
             GUILayout.EndHorizontal();
-            
+
             GUILayout.Space(15);
 
             // 其他功能
             GUILayout.Label("🔧 Other Functions:");
-            
+
             if (GUILayout.Button("Validate Current Scene", GUILayout.Height(25)))
             {
                 ValidateScene();
             }
-            
+
             if (GUILayout.Button("Clear All Logs", GUILayout.Height(25)))
             {
                 logMessages.Clear();
             }
 
             GUILayout.Space(10);
-            
+
             // 设置开关
             GUILayout.Label("⚙️ Settings:");
             showLogs = GUILayout.Toggle(showLogs, "Show Logs");
@@ -248,7 +253,7 @@ namespace Demo
                 DrawSystemStatus();
                 GUILayout.Space(10);
             }
-            
+
             if (showLogs)
             {
                 DrawLogPanel();
@@ -258,19 +263,19 @@ namespace Demo
         private void DrawSystemStatus()
         {
             GUILayout.Label("📊 System Status:", GUI.skin.box);
-            
-            bool isInitialized = SceneManagerMain.Instance?.IsInitialized() ?? false;
-            string currentScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
-            
+
+            var isInitialized = SceneManagerMain.Instance?.IsInitialized() ?? false;
+            var currentScene = SceneManager.GetActiveScene().name;
+
             GUILayout.Label($"🟢 Status: {statusMessage}");
             GUILayout.Label($"🔧 Initialized: {(isInitialized ? "✅" : "❌")}");
             GUILayout.Label($"🎬 Current Scene: {currentScene}");
-            
+
             if (SceneManagerMain.Instance?.SceneManager != null)
             {
                 var loadedScenes = SceneManagerMain.Instance.SceneManager.GetLoadedSceneNames();
                 GUILayout.Label($"📚 Loaded Scenes: {loadedScenes.Length}");
-                
+
                 if (loadedScenes.Length > 0)
                 {
                     GUILayout.Label($"   📋 {string.Join(", ", loadedScenes)}");
@@ -287,14 +292,14 @@ namespace Demo
         private void DrawLogPanel()
         {
             GUILayout.Label("📝 Event Log:", GUI.skin.box);
-            
+
             scrollPosition = GUILayout.BeginScrollView(scrollPosition, GUILayout.Height(200));
-            
-            foreach (string log in logMessages.TakeLast(20))
+
+            foreach (var log in logMessages.TakeLast(20))
             {
                 GUILayout.Label(log, GUI.skin.textArea);
             }
-            
+
             GUILayout.EndScrollView();
         }
 
@@ -303,14 +308,14 @@ namespace Demo
         {
             AddLog($"🔄 Loading scene: {sceneName}");
             statusMessage = $"Loading {sceneName}...";
-            
+
             if (SceneManagerMain.Instance != null)
             {
                 SceneManagerMain.Instance.LoadSceneWithTransition(sceneName, 1f, false);
             }
             else
             {
-                UnityEngine.SceneManagement.SceneManager.LoadScene(sceneName);
+                SceneManager.LoadScene(sceneName);
             }
         }
 
@@ -318,7 +323,7 @@ namespace Demo
         {
             AddLog($"✨ Transitioning to scene: {sceneName}");
             statusMessage = $"Transitioning to {sceneName}...";
-            
+
             if (SceneManagerMain.Instance != null)
             {
                 SceneManagerMain.Instance.LoadSceneWithTransition(sceneName, 2f, true);
@@ -333,7 +338,7 @@ namespace Demo
         {
             AddLog($"⚡ Preloading scene: {sceneName}");
             statusMessage = $"Preloading {sceneName}...";
-            
+
             if (SceneManagerMain.Instance != null)
             {
                 SceneManagerMain.Instance.PreloadScene(sceneName);
@@ -344,7 +349,7 @@ namespace Demo
         {
             AddLog($"🗑️ Unloading scene: {sceneName}");
             statusMessage = $"Unloading {sceneName}...";
-            
+
             if (SceneManagerMain.Instance?.SceneManager != null)
             {
                 SceneManagerMain.Instance.SceneManager.UnloadScene(sceneName);
@@ -355,7 +360,7 @@ namespace Demo
         {
             AddLog($"💾 Saving game to: {saveName}");
             statusMessage = $"Saving to {saveName}...";
-            
+
             if (SceneManagerMain.Instance != null)
             {
                 SceneManagerMain.Instance.SaveGame(saveName);
@@ -366,10 +371,10 @@ namespace Demo
         {
             AddLog($"📂 Loading game from: {saveName}");
             statusMessage = $"Loading from {saveName}...";
-            
+
             if (SceneManagerMain.Instance != null)
             {
-                bool success = SceneManagerMain.Instance.LoadGame(saveName);
+                var success = SceneManagerMain.Instance.LoadGame(saveName);
                 if (!success)
                 {
                     AddLog($"❌ Failed to load save: {saveName}");
@@ -381,7 +386,7 @@ namespace Demo
         {
             AddLog("🔍 Validating current scene...");
             statusMessage = "Validating scene...";
-            
+
             if (SceneManagerMain.Instance != null)
             {
                 SceneManagerMain.Instance.ValidateCurrentScene();
@@ -395,7 +400,7 @@ namespace Demo
             statusMessage = $"Loading {sceneName}...";
         }
 
-        private void OnSceneLoaded(string sceneName, UnityEngine.SceneManagement.Scene scene)
+        private void OnSceneLoaded(string sceneName, Scene scene)
         {
             AddLog($"✅ Scene loaded: {sceneName}");
             statusMessage = "Ready";
@@ -426,14 +431,14 @@ namespace Demo
 
         private void OnSaveCompleted(string saveName, bool success)
         {
-            string result = success ? "✅" : "❌";
+            var result = success ? "✅" : "❌";
             AddLog($"{result} Save {(success ? "completed" : "failed")}: {saveName}");
             statusMessage = success ? "Save completed" : "Save failed";
         }
 
         private void OnLoadCompleted(string saveName, bool success)
         {
-            string result = success ? "✅" : "❌";
+            var result = success ? "✅" : "❌";
             AddLog($"{result} Load {(success ? "completed" : "failed")}: {saveName}");
             statusMessage = success ? "Load completed" : "Load failed";
         }
@@ -450,9 +455,9 @@ namespace Demo
 
         private void AddLog(string message)
         {
-            string timestamp = System.DateTime.Now.ToString("HH:mm:ss");
+            var timestamp = DateTime.Now.ToString("HH:mm:ss");
             logMessages.Add($"[{timestamp}] {message}");
-            
+
             // 限制日志数量
             if (logMessages.Count > 50)
             {
@@ -502,7 +507,7 @@ namespace Demo
         }
 
         // 编辑器快捷键
-        [System.Diagnostics.Conditional("UNITY_EDITOR")]
+        [Conditional("UNITY_EDITOR")]
         private void Update()
         {
             if (Input.GetKeyDown(KeyCode.F1)) LoadScene(testScenes[0]);

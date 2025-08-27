@@ -49,13 +49,13 @@ namespace SceneManagement.Runtime
         {
             if (transitionCanvas == null)
             {
-                GameObject canvasObj = new GameObject("TransitionCanvas");
+                var canvasObj = new GameObject("TransitionCanvas");
                 canvasObj.transform.SetParent(transform);
                 transitionCanvas = canvasObj.AddComponent<Canvas>();
                 transitionCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
                 transitionCanvas.sortingOrder = 1000;
 
-                CanvasScaler scaler = canvasObj.AddComponent<CanvasScaler>();
+                var scaler = canvasObj.AddComponent<CanvasScaler>();
                 scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
                 scaler.referenceResolution = new Vector2(1920, 1080);
 
@@ -64,12 +64,12 @@ namespace SceneManagement.Runtime
 
             if (fadeImage == null)
             {
-                GameObject fadeObj = new GameObject("FadeImage");
+                var fadeObj = new GameObject("FadeImage");
                 fadeObj.transform.SetParent(transitionCanvas.transform, false);
                 fadeImage = fadeObj.AddComponent<Image>();
                 fadeImage.color = Color.black;
 
-                RectTransform rectTransform = fadeImage.GetComponent<RectTransform>();
+                var rectTransform = fadeImage.GetComponent<RectTransform>();
                 rectTransform.anchorMin = Vector2.zero;
                 rectTransform.anchorMax = Vector2.one;
                 rectTransform.sizeDelta = Vector2.zero;
@@ -84,17 +84,17 @@ namespace SceneManagement.Runtime
         {
             if (loadingScreen == null)
             {
-                GameObject loadingObj = new GameObject("LoadingScreen");
+                var loadingObj = new GameObject("LoadingScreen");
                 loadingObj.transform.SetParent(transitionCanvas.transform, false);
                 loadingScreen = loadingObj;
 
-                RectTransform rectTransform = loadingObj.AddComponent<RectTransform>();
+                var rectTransform = loadingObj.AddComponent<RectTransform>();
                 rectTransform.anchorMin = Vector2.zero;
                 rectTransform.anchorMax = Vector2.one;
                 rectTransform.sizeDelta = Vector2.zero;
                 rectTransform.anchoredPosition = Vector2.zero;
 
-                GameObject textObj = new GameObject("LoadingText");
+                var textObj = new GameObject("LoadingText");
                 textObj.transform.SetParent(loadingObj.transform, false);
                 loadingText = textObj.AddComponent<Text>();
                 loadingText.text = loadingMessages[0];
@@ -103,33 +103,33 @@ namespace SceneManagement.Runtime
                 loadingText.alignment = TextAnchor.MiddleCenter;
                 loadingText.color = Color.white;
 
-                RectTransform textRect = textObj.GetComponent<RectTransform>();
+                var textRect = textObj.GetComponent<RectTransform>();
                 textRect.anchorMin = new Vector2(0.5f, 0.4f);
                 textRect.anchorMax = new Vector2(0.5f, 0.6f);
                 textRect.sizeDelta = new Vector2(400, 100);
                 textRect.anchoredPosition = Vector2.zero;
 
-                GameObject progressObj = new GameObject("ProgressBar");
+                var progressObj = new GameObject("ProgressBar");
                 progressObj.transform.SetParent(loadingObj.transform, false);
                 progressBar = progressObj.AddComponent<Slider>();
                 progressBar.minValue = 0f;
                 progressBar.maxValue = 1f;
                 progressBar.value = 0f;
 
-                RectTransform progressRect = progressObj.GetComponent<RectTransform>();
+                var progressRect = progressObj.GetComponent<RectTransform>();
                 progressRect.anchorMin = new Vector2(0.3f, 0.3f);
                 progressRect.anchorMax = new Vector2(0.7f, 0.35f);
                 progressRect.sizeDelta = Vector2.zero;
                 progressRect.anchoredPosition = Vector2.zero;
 
-                GameObject background = new GameObject("Background");
+                var background = new GameObject("Background");
                 background.transform.SetParent(progressObj.transform, false);
-                Image bgImage = background.AddComponent<Image>();
+                var bgImage = background.AddComponent<Image>();
                 bgImage.color = new Color(0.2f, 0.2f, 0.2f, 0.8f);
 
-                GameObject fill = new GameObject("Fill");
+                var fill = new GameObject("Fill");
                 fill.transform.SetParent(progressObj.transform, false);
-                Image fillImage = fill.AddComponent<Image>();
+                var fillImage = fill.AddComponent<Image>();
                 fillImage.color = new Color(0.3f, 0.8f, 0.3f, 1f);
 
                 progressBar.targetGraphic = fillImage;
@@ -237,30 +237,30 @@ namespace SceneManagement.Runtime
         {
             SetTransitionVisibility(true);
 
-            float startAlpha = fadeIn ? 0f : 1f;
-            float endAlpha = fadeIn ? 1f : 0f;
-            AnimationCurve curve = fadeIn ? fadeInCurve : fadeOutCurve;
+            var startAlpha = fadeIn ? 0f : 1f;
+            var endAlpha = fadeIn ? 1f : 0f;
+            var curve = fadeIn ? fadeInCurve : fadeOutCurve;
 
-            Color startColor = fadeImage.color;
+            var startColor = fadeImage.color;
             startColor.a = startAlpha;
             fadeImage.color = startColor;
 
-            float elapsedTime = 0f;
+            var elapsedTime = 0f;
 
             while (elapsedTime < duration)
             {
                 elapsedTime += Time.deltaTime;
-                float t = elapsedTime / duration;
-                float alpha = Mathf.Lerp(startAlpha, endAlpha, curve.Evaluate(t));
+                var t = elapsedTime / duration;
+                var alpha = Mathf.Lerp(startAlpha, endAlpha, curve.Evaluate(t));
 
-                Color color = fadeImage.color;
+                var color = fadeImage.color;
                 color.a = alpha;
                 fadeImage.color = color;
 
                 yield return null;
             }
 
-            Color finalColor = fadeImage.color;
+            var finalColor = fadeImage.color;
             finalColor.a = endAlpha;
             fadeImage.color = finalColor;
 
@@ -292,9 +292,9 @@ namespace SceneManagement.Runtime
         {
             if (loadingText != null && loadingMessages.Length > 0)
             {
-                int messageIndex = Mathf.FloorToInt(time) % loadingMessages.Length;
-                int dotCount = Mathf.FloorToInt((time * 2f) % 4f);
-                string dots = new string('.', dotCount);
+                var messageIndex = Mathf.FloorToInt(time) % loadingMessages.Length;
+                var dotCount = Mathf.FloorToInt((time * 2f) % 4f);
+                var dots = new string('.', dotCount);
                 loadingText.text = loadingMessages[messageIndex] + dots;
             }
         }
@@ -308,7 +308,7 @@ namespace SceneManagement.Runtime
         {
             if (fadeImage != null)
             {
-                Color newColor = color;
+                var newColor = color;
                 newColor.a = fadeImage.color.a;
                 fadeImage.color = newColor;
             }

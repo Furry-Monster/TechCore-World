@@ -81,7 +81,7 @@ namespace SceneManagement.Runtime
             if (string.IsNullOrEmpty(sceneName))
                 return;
 
-            PreloadSettings settings = new PreloadSettings
+            var settings = new PreloadSettings
             {
                 sceneName = sceneName,
                 priority = priority,
@@ -135,7 +135,7 @@ namespace SceneManagement.Runtime
                     yield return new WaitForSeconds(0.1f);
                 }
 
-                PreloadSettings settings = pendingPreloads.Dequeue();
+                var settings = pendingPreloads.Dequeue();
 
                 if (settings.preloadDelay > 0)
                 {
@@ -198,9 +198,9 @@ namespace SceneManagement.Runtime
             if (!enableSmartPreloading)
                 return;
 
-            List<string> recommendedScenes = GetRecommendedScenes(currentSceneName);
+            var recommendedScenes = GetRecommendedScenes(currentSceneName);
 
-            foreach (string sceneName in recommendedScenes)
+            foreach (var sceneName in recommendedScenes)
             {
                 if (currentlyPreloading.Count >= maxConcurrentPreloads)
                     break;
@@ -211,21 +211,21 @@ namespace SceneManagement.Runtime
 
         private List<string> GetRecommendedScenes(string currentSceneName)
         {
-            List<string> recommended = new List<string>();
+            var recommended = new List<string>();
 
             var sortedScenes = new List<KeyValuePair<string, float>>();
             foreach (var kvp in sceneUsageFrequency)
             {
                 if (kvp.Key != currentSceneName)
                 {
-                    float score = CalculatePreloadScore(kvp.Key);
+                    var score = CalculatePreloadScore(kvp.Key);
                     sortedScenes.Add(new KeyValuePair<string, float>(kvp.Key, score));
                 }
             }
 
             sortedScenes.Sort((a, b) => b.Value.CompareTo(a.Value));
 
-            for (int i = 0; i < Mathf.Min(3, sortedScenes.Count); i++)
+            for (var i = 0; i < Mathf.Min(3, sortedScenes.Count); i++)
             {
                 recommended.Add(sortedScenes[i].Key);
             }
@@ -249,7 +249,7 @@ namespace SceneManagement.Runtime
 
         private int GetSmartPreloadPriority(string sceneName)
         {
-            float score = CalculatePreloadScore(sceneName);
+            var score = CalculatePreloadScore(sceneName);
             return Mathf.RoundToInt(score * 100f);
         }
 
@@ -285,10 +285,10 @@ namespace SceneManagement.Runtime
 
         private void LoadUsageData()
         {
-            string json = PlayerPrefs.GetString("SceneUsageData", "{}");
+            var json = PlayerPrefs.GetString("SceneUsageData", "{}");
             try
             {
-                SceneUsageData data = JsonUtility.FromJson<SceneUsageData>(json);
+                var data = JsonUtility.FromJson<SceneUsageData>(json);
                 if (data is { usageFrequency: not null })
                 {
                     sceneUsageFrequency = data.usageFrequency;
@@ -304,11 +304,11 @@ namespace SceneManagement.Runtime
         {
             try
             {
-                SceneUsageData data = new SceneUsageData
+                var data = new SceneUsageData
                 {
                     usageFrequency = sceneUsageFrequency
                 };
-                string json = JsonUtility.ToJson(data);
+                var json = JsonUtility.ToJson(data);
                 PlayerPrefs.SetString("SceneUsageData", json);
                 PlayerPrefs.Save();
             }

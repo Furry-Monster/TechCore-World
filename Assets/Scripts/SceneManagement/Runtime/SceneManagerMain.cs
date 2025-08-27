@@ -195,8 +195,8 @@ namespace SceneManagement.Runtime
 
             if (sceneTransition != null && settings.enableTransitions)
             {
-                float transitionDuration = duration ?? settings.defaultTransitionDuration;
-                bool showLoadingScreen = showLoading ?? settings.showLoadingScreen;
+                var transitionDuration = duration ?? settings.defaultTransitionDuration;
+                var showLoadingScreen = showLoading ?? settings.showLoadingScreen;
 
                 sceneTransition.FadeToScene(sceneName, transitionDuration, showLoadingScreen);
             }
@@ -268,7 +268,7 @@ namespace SceneManagement.Runtime
 
             if (sceneValidator != null)
             {
-                string currentScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+                var currentScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
                 sceneValidator.ValidateScene(currentScene);
             }
         }
@@ -354,8 +354,8 @@ namespace SceneManagement.Runtime
         [ContextMenu("Validate System Components")]
         public void ValidateSystemComponents()
         {
-            bool allValid = true;
-            string report = "Scene Management System Validation Report:\n";
+            var allValid = true;
+            var report = "Scene Management System Validation Report:\n";
 
             if (sceneManagerCore == null)
             {

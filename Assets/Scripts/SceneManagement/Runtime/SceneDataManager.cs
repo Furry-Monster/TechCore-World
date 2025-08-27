@@ -101,7 +101,7 @@ namespace SceneManagement.Runtime
 
         private void CreateSaveDirectory()
         {
-            string fullPath = Path.Combine(Application.persistentDataPath, saveDirectory);
+            var fullPath = Path.Combine(Application.persistentDataPath, saveDirectory);
             if (!Directory.Exists(fullPath))
             {
                 Directory.CreateDirectory(fullPath);
@@ -119,7 +119,7 @@ namespace SceneManagement.Runtime
             {
                 SaveCurrentSceneState();
 
-                GameSaveData saveData = new GameSaveData
+                var saveData = new GameSaveData
                 {
                     saveName = saveName,
                     saveTime = DateTime.Now,
@@ -128,8 +128,8 @@ namespace SceneManagement.Runtime
                     globalGameData = new Dictionary<string, object>(globalGameData)
                 };
 
-                string filePath = GetSaveFilePath(saveName);
-                string jsonData = JsonUtility.ToJson(saveData, true);
+                var filePath = GetSaveFilePath(saveName);
+                var jsonData = JsonUtility.ToJson(saveData, true);
 
                 if (enableEncryption)
                 {
@@ -152,21 +152,21 @@ namespace SceneManagement.Runtime
 
             try
             {
-                string filePath = GetSaveFilePath(saveName);
+                var filePath = GetSaveFilePath(saveName);
                 if (!File.Exists(filePath))
                 {
                     OnLoadCompleted?.Invoke(saveName, false);
                     return false;
                 }
 
-                string jsonData = File.ReadAllText(filePath);
+                var jsonData = File.ReadAllText(filePath);
 
                 if (enableEncryption)
                 {
                     jsonData = DecryptData(jsonData);
                 }
 
-                GameSaveData saveData = JsonUtility.FromJson<GameSaveData>(jsonData);
+                var saveData = JsonUtility.FromJson<GameSaveData>(jsonData);
 
                 if (saveData == null)
                 {
@@ -203,20 +203,20 @@ namespace SceneManagement.Runtime
 
         public void SaveCurrentSceneState()
         {
-            string currentScene = GetCurrentSceneName();
+            var currentScene = GetCurrentSceneName();
             if (string.IsNullOrEmpty(currentScene))
                 return;
 
-            SceneState sceneState = GetOrCreateSceneState(currentScene);
+            var sceneState = GetOrCreateSceneState(currentScene);
 
-            GameObject player = GameObject.FindGameObjectWithTag("Player");
+            var player = GameObject.FindGameObjectWithTag("Player");
             if (player != null)
             {
                 sceneState.playerPosition = player.transform.position;
                 sceneState.playerRotation = player.transform.rotation;
             }
 
-            ISceneStatePersistent[] persistentObjects = FindObjectsOfType<MonoBehaviour>()
+            var persistentObjects = FindObjectsOfType<MonoBehaviour>()
                 .OfType<ISceneStatePersistent>()
                 .ToArray();
 
@@ -225,8 +225,8 @@ namespace SceneManagement.Runtime
             {
                 try
                 {
-                    string id = persistentObj.GetPersistentID();
-                    Dictionary<string, object> objState = persistentObj.SaveState();
+                    var id = persistentObj.GetPersistentID();
+                    var objState = persistentObj.SaveState();
                     if (objState != null && !string.IsNullOrEmpty(id))
                     {
                         sceneState.customData[id] = objState;
@@ -254,14 +254,14 @@ namespace SceneManagement.Runtime
                 return;
             }
 
-            GameObject player = GameObject.FindGameObjectWithTag("Player");
+            var player = GameObject.FindGameObjectWithTag("Player");
             if (player != null)
             {
                 player.transform.position = sceneState.playerPosition;
                 player.transform.rotation = sceneState.playerRotation;
             }
 
-            ISceneStatePersistent[] persistentObjects = FindObjectsOfType<MonoBehaviour>()
+            var persistentObjects = FindObjectsOfType<MonoBehaviour>()
                 .OfType<ISceneStatePersistent>()
                 .ToArray();
 
@@ -319,16 +319,16 @@ namespace SceneManagement.Runtime
 
         public string[] GetAvailableSaves()
         {
-            string savePath = Path.Combine(Application.persistentDataPath, saveDirectory);
+            var savePath = Path.Combine(Application.persistentDataPath, saveDirectory);
             if (!Directory.Exists(savePath))
                 return Array.Empty<string>();
 
-            string[] files = Directory.GetFiles(savePath, "*.json");
-            List<string> saveNames = new List<string>();
+            var files = Directory.GetFiles(savePath, "*.json");
+            var saveNames = new List<string>();
 
-            foreach (string file in files)
+            foreach (var file in files)
             {
-                string fileName = Path.GetFileNameWithoutExtension(file);
+                var fileName = Path.GetFileNameWithoutExtension(file);
                 saveNames.Add(fileName);
             }
 
@@ -339,7 +339,7 @@ namespace SceneManagement.Runtime
         {
             try
             {
-                string filePath = GetSaveFilePath(saveName);
+                var filePath = GetSaveFilePath(saveName);
                 if (File.Exists(filePath))
                 {
                     File.Delete(filePath);
@@ -356,7 +356,7 @@ namespace SceneManagement.Runtime
 
         private void AutoSave()
         {
-            string autoSaveName = $"AutoSave_{DateTime.Now:yyyyMMdd_HHmmss}";
+            var autoSaveName = $"AutoSave_{DateTime.Now:yyyyMMdd_HHmmss}";
             SaveGame(autoSaveName);
             OnAutoSave?.Invoke(autoSaveName);
 
@@ -366,10 +366,10 @@ namespace SceneManagement.Runtime
 
         private void CleanupOldAutoSaves()
         {
-            string[] saves = GetAvailableSaves();
-            List<string> autoSaves = new List<string>();
+            var saves = GetAvailableSaves();
+            var autoSaves = new List<string>();
 
-            foreach (string save in saves)
+            foreach (var save in saves)
             {
                 if (save.StartsWith("AutoSave_"))
                 {
@@ -380,7 +380,7 @@ namespace SceneManagement.Runtime
             if (autoSaves.Count > maxAutoSaveSlots)
             {
                 autoSaves.Sort();
-                for (int i = 0; i < autoSaves.Count - maxAutoSaveSlots; i++)
+                for (var i = 0; i < autoSaves.Count - maxAutoSaveSlots; i++)
                 {
                     DeleteSave(autoSaves[i]);
                 }
@@ -409,14 +409,14 @@ namespace SceneManagement.Runtime
 
         private string GenerateChecksum(SceneState sceneState)
         {
-            string data =
+            var data =
                 $"{sceneState.sceneName}{sceneState.playerPosition}{sceneState.playerRotation}{sceneState.timeStamp}";
             return data.GetHashCode().ToString();
         }
 
         private bool ValidateChecksum(SceneState sceneState)
         {
-            string expectedChecksum = GenerateChecksum(sceneState);
+            var expectedChecksum = GenerateChecksum(sceneState);
             return expectedChecksum == sceneState.checksum;
         }
 
@@ -427,7 +427,7 @@ namespace SceneManagement.Runtime
 
         private string DecryptData(string encryptedData)
         {
-            byte[] bytes = Convert.FromBase64String(encryptedData);
+            var bytes = Convert.FromBase64String(encryptedData);
             return Encoding.UTF8.GetString(bytes);
         }
 

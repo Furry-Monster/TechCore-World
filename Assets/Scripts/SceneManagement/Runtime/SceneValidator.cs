@@ -144,7 +144,7 @@ namespace SceneManagement.Runtime
 
         public List<ValidationResult> ValidateScene(string sceneName)
         {
-            List<ValidationResult> results = new List<ValidationResult>();
+            var results = new List<ValidationResult>();
 
             if (string.IsNullOrEmpty(sceneName))
             {
@@ -153,7 +153,7 @@ namespace SceneManagement.Runtime
                 return results;
             }
 
-            Scene scene = SceneManager.GetSceneByName(sceneName);
+            var scene = SceneManager.GetSceneByName(sceneName);
             if (!scene.isLoaded)
             {
                 results.Add(new ValidationResult(sceneName, "SceneLoaded", false,
@@ -165,7 +165,7 @@ namespace SceneManagement.Runtime
             {
                 if (!rule.isEnabled) continue;
 
-                ValidationResult result = ValidateRule(sceneName, scene, rule);
+                var result = ValidateRule(sceneName, scene, rule);
                 results.Add(result);
 
                 if (!result.passed)
@@ -195,33 +195,18 @@ namespace SceneManagement.Runtime
         {
             try
             {
-                switch (rule.validationType)
+                return rule.validationType switch
                 {
-                    case ValidationType.SceneExists:
-                        return ValidateSceneExists(sceneName, rule);
-
-                    case ValidationType.RequiredTag:
-                        return ValidateRequiredTag(sceneName, scene, rule);
-
-                    case ValidationType.RequiredComponent:
-                        return ValidateRequiredComponent(sceneName, scene, rule);
-
-                    case ValidationType.RequiredLayer:
-                        return ValidateRequiredLayer(sceneName, scene, rule);
-
-                    case ValidationType.MinimumGameObjects:
-                        return ValidateMinimumGameObjects(sceneName, scene, rule);
-
-                    case ValidationType.MaximumGameObjects:
-                        return ValidateMaximumGameObjects(sceneName, scene, rule);
-
-                    case ValidationType.CustomValidation:
-                        return ValidateCustomRule(sceneName, scene, rule);
-
-                    default:
-                        return new ValidationResult(sceneName, rule.ruleName, false,
-                            ValidationSeverity.Error, $"Unknown validation type: {rule.validationType}");
-                }
+                    ValidationType.SceneExists => ValidateSceneExists(sceneName, rule),
+                    ValidationType.RequiredTag => ValidateRequiredTag(sceneName, scene, rule),
+                    ValidationType.RequiredComponent => ValidateRequiredComponent(sceneName, scene, rule),
+                    ValidationType.RequiredLayer => ValidateRequiredLayer(sceneName, scene, rule),
+                    ValidationType.MinimumGameObjects => ValidateMinimumGameObjects(sceneName, scene, rule),
+                    ValidationType.MaximumGameObjects => ValidateMaximumGameObjects(sceneName, scene, rule),
+                    ValidationType.CustomValidation => ValidateCustomRule(sceneName, scene, rule),
+                    _ => new ValidationResult(sceneName, rule.ruleName, false, ValidationSeverity.Error,
+                        $"Unknown validation type: {rule.validationType}")
+                };
             }
             catch (Exception ex)
             {
@@ -232,12 +217,12 @@ namespace SceneManagement.Runtime
 
         private ValidationResult ValidateSceneExists(string sceneName, SceneValidationRule rule)
         {
-            for (int i = 0; i < SceneManager.sceneCountInBuildSettings; i++)
+            for (var i = 0; i < SceneManager.sceneCountInBuildSettings; i++)
             {
                 var scenePath = SceneUtility.GetScenePathByBuildIndex(i);
-                var name = Path.GetFileNameWithoutExtension(scenePath);
+                var nameWithoutExtension = Path.GetFileNameWithoutExtension(scenePath);
 
-                if (name == sceneName)
+                if (nameWithoutExtension == sceneName)
                 {
                     return new ValidationResult(sceneName, rule.ruleName, true,
                         ValidationSeverity.Info, "Scene exists in build settings");
@@ -250,9 +235,9 @@ namespace SceneManagement.Runtime
 
         private ValidationResult ValidateRequiredTag(string sceneName, Scene scene, SceneValidationRule rule)
         {
-            GameObject[] rootObjects = scene.GetRootGameObjects();
+            var rootObjects = scene.GetRootGameObjects();
 
-            foreach (GameObject root in rootObjects)
+            foreach (var root in rootObjects)
             {
                 if (FindGameObjectWithTag(root, rule.expectedValue) != null)
                 {
@@ -261,10 +246,10 @@ namespace SceneManagement.Runtime
                 }
             }
 
-            ValidationSeverity severity = !string.IsNullOrEmpty(rule.errorMessage)
+            var severity = !string.IsNullOrEmpty(rule.errorMessage)
                 ? ValidationSeverity.Error
                 : ValidationSeverity.Warning;
-            string message = !string.IsNullOrEmpty(rule.errorMessage)
+            var message = !string.IsNullOrEmpty(rule.errorMessage)
                 ? rule.errorMessage
                 : rule.warningMessage ?? $"No object with tag '{rule.expectedValue}' found";
 
@@ -273,9 +258,9 @@ namespace SceneManagement.Runtime
 
         private ValidationResult ValidateRequiredComponent(string sceneName, Scene scene, SceneValidationRule rule)
         {
-            GameObject[] rootObjects = scene.GetRootGameObjects();
+            var rootObjects = scene.GetRootGameObjects();
 
-            foreach (GameObject root in rootObjects)
+            foreach (var root in rootObjects)
             {
                 if (FindComponentInChildren(root, rule.expectedValue) != null)
                 {
@@ -284,10 +269,10 @@ namespace SceneManagement.Runtime
                 }
             }
 
-            ValidationSeverity severity = !string.IsNullOrEmpty(rule.errorMessage)
+            var severity = !string.IsNullOrEmpty(rule.errorMessage)
                 ? ValidationSeverity.Error
                 : ValidationSeverity.Warning;
-            string message = !string.IsNullOrEmpty(rule.errorMessage)
+            var message = !string.IsNullOrEmpty(rule.errorMessage)
                 ? rule.errorMessage
                 : rule.warningMessage ?? $"No component '{rule.expectedValue}' found";
 
@@ -296,16 +281,16 @@ namespace SceneManagement.Runtime
 
         private ValidationResult ValidateRequiredLayer(string sceneName, Scene scene, SceneValidationRule rule)
         {
-            int layerIndex = LayerMask.NameToLayer(rule.expectedValue);
+            var layerIndex = LayerMask.NameToLayer(rule.expectedValue);
             if (layerIndex == -1)
             {
                 return new ValidationResult(sceneName, rule.ruleName, false,
                     ValidationSeverity.Error, $"Layer '{rule.expectedValue}' does not exist");
             }
 
-            GameObject[] rootObjects = scene.GetRootGameObjects();
+            var rootObjects = scene.GetRootGameObjects();
 
-            foreach (GameObject root in rootObjects)
+            foreach (var root in rootObjects)
             {
                 if (FindGameObjectOnLayer(root, layerIndex) != null)
                 {
@@ -314,10 +299,10 @@ namespace SceneManagement.Runtime
                 }
             }
 
-            ValidationSeverity severity = !string.IsNullOrEmpty(rule.errorMessage)
+            var severity = !string.IsNullOrEmpty(rule.errorMessage)
                 ? ValidationSeverity.Error
                 : ValidationSeverity.Warning;
-            string message = !string.IsNullOrEmpty(rule.errorMessage)
+            var message = !string.IsNullOrEmpty(rule.errorMessage)
                 ? rule.errorMessage
                 : rule.warningMessage ?? $"No object on layer '{rule.expectedValue}' found";
 
@@ -326,23 +311,23 @@ namespace SceneManagement.Runtime
 
         private ValidationResult ValidateMinimumGameObjects(string sceneName, Scene scene, SceneValidationRule rule)
         {
-            if (!int.TryParse(rule.expectedValue, out int minCount))
+            if (!int.TryParse(rule.expectedValue, out var minCount))
             {
                 return new ValidationResult(sceneName, rule.ruleName, false,
                     ValidationSeverity.Error, "Invalid minimum count value");
             }
 
-            GameObject[] allObjects = scene.GetRootGameObjects();
-            int totalCount = 0;
+            var allObjects = scene.GetRootGameObjects();
+            var totalCount = 0;
 
-            foreach (GameObject root in allObjects)
+            foreach (var root in allObjects)
             {
                 totalCount += CountAllChildren(root);
             }
 
-            bool passed = totalCount >= minCount;
-            ValidationSeverity severity = passed ? ValidationSeverity.Info : ValidationSeverity.Warning;
-            string message = passed
+            var passed = totalCount >= minCount;
+            var severity = passed ? ValidationSeverity.Info : ValidationSeverity.Warning;
+            var message = passed
                 ? $"Scene has {totalCount} objects (minimum: {minCount})"
                 : $"Scene has only {totalCount} objects, minimum required: {minCount}";
 
@@ -351,23 +336,23 @@ namespace SceneManagement.Runtime
 
         private ValidationResult ValidateMaximumGameObjects(string sceneName, Scene scene, SceneValidationRule rule)
         {
-            if (!int.TryParse(rule.expectedValue, out int maxCount))
+            if (!int.TryParse(rule.expectedValue, out var maxCount))
             {
                 return new ValidationResult(sceneName, rule.ruleName, false,
                     ValidationSeverity.Error, "Invalid maximum count value");
             }
 
-            GameObject[] allObjects = scene.GetRootGameObjects();
-            int totalCount = 0;
+            var allObjects = scene.GetRootGameObjects();
+            var totalCount = 0;
 
-            foreach (GameObject root in allObjects)
+            foreach (var root in allObjects)
             {
                 totalCount += CountAllChildren(root);
             }
 
-            bool passed = totalCount <= maxCount;
-            ValidationSeverity severity = passed ? ValidationSeverity.Info : ValidationSeverity.Warning;
-            string message = passed
+            var passed = totalCount <= maxCount;
+            var severity = passed ? ValidationSeverity.Info : ValidationSeverity.Warning;
+            var message = passed
                 ? $"Scene has {totalCount} objects (maximum: {maxCount})"
                 : $"Scene has {totalCount} objects, maximum allowed: {maxCount}";
 
@@ -385,9 +370,9 @@ namespace SceneManagement.Runtime
             if (parent.CompareTag(tag))
                 return parent;
 
-            for (int i = 0; i < parent.transform.childCount; i++)
+            for (var i = 0; i < parent.transform.childCount; i++)
             {
-                GameObject result = FindGameObjectWithTag(parent.transform.GetChild(i).gameObject, tag);
+                var result = FindGameObjectWithTag(parent.transform.GetChild(i).gameObject, tag);
                 if (result != null)
                     return result;
             }
@@ -397,13 +382,13 @@ namespace SceneManagement.Runtime
 
         private Component FindComponentInChildren(GameObject parent, string componentName)
         {
-            Component component = parent.GetComponent(componentName);
+            var component = parent.GetComponent(componentName);
             if (component != null)
                 return component;
 
-            for (int i = 0; i < parent.transform.childCount; i++)
+            for (var i = 0; i < parent.transform.childCount; i++)
             {
-                Component result = FindComponentInChildren(parent.transform.GetChild(i).gameObject, componentName);
+                var result = FindComponentInChildren(parent.transform.GetChild(i).gameObject, componentName);
                 if (result != null)
                     return result;
             }
@@ -416,9 +401,9 @@ namespace SceneManagement.Runtime
             if (parent.layer == layer)
                 return parent;
 
-            for (int i = 0; i < parent.transform.childCount; i++)
+            for (var i = 0; i < parent.transform.childCount; i++)
             {
-                GameObject result = FindGameObjectOnLayer(parent.transform.GetChild(i).gameObject, layer);
+                var result = FindGameObjectOnLayer(parent.transform.GetChild(i).gameObject, layer);
                 if (result != null)
                     return result;
             }
@@ -428,9 +413,9 @@ namespace SceneManagement.Runtime
 
         private int CountAllChildren(GameObject parent)
         {
-            int count = 1; // Count the parent itself
+            var count = 1; // Count the parent itself
 
-            for (int i = 0; i < parent.transform.childCount; i++)
+            for (var i = 0; i < parent.transform.childCount; i++)
             {
                 count += CountAllChildren(parent.transform.GetChild(i).gameObject);
             }
@@ -440,9 +425,9 @@ namespace SceneManagement.Runtime
 
         private void LogValidationResults(string sceneName, List<ValidationResult> results)
         {
-            int passedCount = 0;
-            int warningCount = 0;
-            int errorCount = 0;
+            var passedCount = 0;
+            var warningCount = 0;
+            var errorCount = 0;
 
             foreach (var result in results)
             {

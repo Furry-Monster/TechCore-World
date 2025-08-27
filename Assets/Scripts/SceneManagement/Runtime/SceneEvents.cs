@@ -184,7 +184,7 @@ namespace SceneManagement.Runtime
 
         private void EnqueueEvent(SceneEventType eventType, string sceneName, object[] parameters)
         {
-            SceneEventData eventData = new SceneEventData
+            var eventData = new SceneEventData
             {
                 eventType = eventType,
                 sceneName = sceneName,
@@ -203,11 +203,11 @@ namespace SceneManagement.Runtime
         private IEnumerator ProcessEventQueue()
         {
             isProcessingEvents = true;
-            int eventsProcessed = 0;
+            var eventsProcessed = 0;
 
             while (eventQueue.Count > 0 && eventsProcessed < maxEventsPerFrame)
             {
-                SceneEventData eventData = eventQueue.Dequeue();
+                var eventData = eventQueue.Dequeue();
                 ProcessEvent(eventData.eventType, eventData.sceneName, eventData.parameters);
                 eventsProcessed++;
 
