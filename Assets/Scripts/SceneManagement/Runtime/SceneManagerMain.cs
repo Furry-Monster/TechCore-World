@@ -40,7 +40,7 @@ namespace SceneManagement.Runtime
             set
             {
                 settings = value;
-                if (isInitialized)
+                if (IsInitialized)
                 {
                     ConfigureComponents();
                 }
@@ -63,9 +63,7 @@ namespace SceneManagement.Runtime
         public SceneValidator Validator => sceneValidator;
         public SceneEvents Events => sceneEvents;
 
-        private bool isInitialized;
-
-        public bool IsInitialized => isInitialized;
+        public bool IsInitialized { get; private set; }
 
 
         private void Awake()
@@ -92,7 +90,7 @@ namespace SceneManagement.Runtime
 
         public void InitializeSceneManager()
         {
-            if (isInitialized)
+            if (IsInitialized)
             {
                 Debug.LogWarning("SceneManagerMain is already initialized!");
                 return;
@@ -106,7 +104,7 @@ namespace SceneManagement.Runtime
             CreateOrFindComponents();
             ConfigureComponents();
 
-            isInitialized = true;
+            IsInitialized = true;
 
             if (settings.enableLogging)
             {
@@ -164,7 +162,7 @@ namespace SceneManagement.Runtime
 
         public void LoadSceneWithTransition(string sceneName, float? duration = null, bool? showLoading = null)
         {
-            if (!isInitialized)
+            if (!IsInitialized)
             {
                 Debug.LogError("SceneManagerMain is not initialized!");
                 return;
@@ -189,7 +187,7 @@ namespace SceneManagement.Runtime
 
         public void PreloadScene(string sceneName)
         {
-            if (!isInitialized)
+            if (!IsInitialized)
             {
                 Debug.LogError("SceneManagerMain is not initialized!");
                 return;
@@ -207,7 +205,7 @@ namespace SceneManagement.Runtime
 
         public void SaveGame(string saveName = null)
         {
-            if (!isInitialized)
+            if (!IsInitialized)
             {
                 Debug.LogError("SceneManagerMain is not initialized!");
                 return;
@@ -221,7 +219,7 @@ namespace SceneManagement.Runtime
 
         public bool LoadGame(string saveName)
         {
-            if (!isInitialized)
+            if (!IsInitialized)
             {
                 Debug.LogError("SceneManagerMain is not initialized!");
                 return false;
@@ -237,17 +235,17 @@ namespace SceneManagement.Runtime
 
         public void ValidateCurrentScene()
         {
-            if (!isInitialized)
+            if (!IsInitialized)
             {
                 Debug.LogError("SceneManagerMain is not initialized!");
                 return;
             }
 
-            if (sceneValidator != null)
-            {
-                var currentScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
-                sceneValidator.ValidateScene(currentScene);
-            }
+            if (sceneValidator == null)
+                return;
+
+            var currentScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+            sceneValidator.ValidateScene(currentScene);
         }
 
         public void Shutdown()
@@ -257,7 +255,7 @@ namespace SceneManagement.Runtime
                 sceneEvents.ClearAllCallbacks();
             }
 
-            isInitialized = false;
+            IsInitialized = false;
 
             if (settings.enableLogging)
             {
@@ -267,11 +265,11 @@ namespace SceneManagement.Runtime
 
         private void OnDestroy()
         {
-            if (Instance == this)
-            {
-                Shutdown();
-                Instance = null;
-            }
+            if (Instance != this)
+                return;
+
+            Shutdown();
+            Instance = null;
         }
     }
 }

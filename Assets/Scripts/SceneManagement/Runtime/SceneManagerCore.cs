@@ -58,11 +58,11 @@ namespace SceneManagement.Runtime
 
         private void OnDestroy()
         {
-            if (Instance == this)
-            {
-                SceneManager.sceneLoaded -= OnSceneLoadedCallback;
-                SceneManager.sceneUnloaded -= OnSceneUnloadedCallback;
-            }
+            if (Instance != this)
+                return;
+
+            SceneManager.sceneLoaded -= OnSceneLoadedCallback;
+            SceneManager.sceneUnloaded -= OnSceneUnloadedCallback;
         }
 
         public void LoadScene(string sceneName, LoadSceneMode loadMode = LoadSceneMode.Single)
@@ -85,18 +85,13 @@ namespace SceneManagement.Runtime
                 return;
             }
 
-            StartCoroutine(LoadSceneAsync(sceneName, loadMode));
+            StartCoroutine(LoadSceneAsyncCoroutine(sceneName, loadMode));
         }
 
         public void LoadSceneAsync(string sceneName, Action<Scene> onComplete = null,
             LoadSceneMode loadMode = LoadSceneMode.Single)
         {
             StartCoroutine(LoadSceneAsyncCoroutine(sceneName, loadMode, onComplete));
-        }
-
-        private IEnumerator LoadSceneAsync(string sceneName, LoadSceneMode loadMode)
-        {
-            yield return LoadSceneAsyncCoroutine(sceneName, loadMode);
         }
 
         private IEnumerator LoadSceneAsyncCoroutine(string sceneName, LoadSceneMode loadMode,
